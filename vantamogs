@@ -435,20 +435,37 @@ end
 -- SILENT AIMBOT
 -- ============================================================================
 do
-    local SACfg = shared.MoozeV2["Silent Aim"]
-    local Mouse = LocalPlayer:GetMouse()
+    local SACfg             = shared.MoozeV2["Silent Aim"]
+    local LocalPlayer       = Players.LocalPlayer
+    local Camera            = Services.Workspace.CurrentCamera
+    local Mouse             = LocalPlayer:GetMouse()
     local LastMousePosition = Vector2.new(0, 0)
-    local CurrentTarget = nil
+    local CurrentTarget     = nil
+    local SilentAimActive   = false
+
+    -- keybind toggle
+    local SAKey = Enum.KeyCode[shared.MoozeV2["General"]["Binds"]["Silent Aim"]:upper()]
+    UserInputService.InputBegan:Connect(function(input, gameProcessed)
+        if gameProcessed then return end
+        if input.KeyCode == SAKey then
+            SilentAimActive = not SilentAimActive
+            ShowNotification("Silent Aim", SilentAimActive and "Enabled" or "Disabled", 2)
+        end
+    end)
 
     local function GetClosestPoint(player)
         local bestPart, bestDistance = nil, math.huge
-        local scale = (SACfg["Closest Point"] or {})["Scale"] or 1.0
+        local pointScale = SACfg["Closest Point"] and SACfg["Closest Point"]["Scale"] or 1.0
         if player.Character then
-            for _, part in ipairs(GetBodyParts(player.Character)) do
-                local sp, on = Camera:WorldToViewportPoint(part.Position)
-                if on and sp.Z > 0 then
-                    local d = (LastMousePosition - Vector2.new(sp.X, sp.Y)).Magnitude * scale
-                    if d < bestDistance then bestPart, bestDistance = part, d end
+            local bodyParts = GetBodyParts(player.Character)
+            for _, part in ipairs(bodyParts) do
+                local screenPosition, onScreen = Camera:WorldToViewportPoint(part.Position)
+                if onScreen and screenPosition.Z > 0 then
+                    local pointPosition = Vector2.new(screenPosition.X, screenPosition.Y)
+                    local distance = (LastMousePosition - pointPosition).Magnitude * pointScale
+                    if distance < bestDistance then
+                        bestPart, bestDistance = part, distance
+                    end
                 end
             end
         end
@@ -456,7 +473,7 @@ do
     end
 
     local FOVCircle = Drawing.new("Circle")
-    FOVCircle.Visible      = SACfg["FOV"]["Visible"]
+    FOVCircle.Visible      = SACfg["FOV"]["Enabled"] and SACfg["FOV"]["Visible"]
     FOVCircle.Transparency = 1
     FOVCircle.Thickness    = 1.5
     FOVCircle.Color        = Color3.new(1, 1, 1)
@@ -467,6 +484,13 @@ do
     local CachedRadius = FOVCircle.Radius
 
     local function IsShiftLockActive()
+        -- check for ADS/aim tool (original check)
+        if LocalPlayer.Character then
+            local tool = LocalPlayer.Character:FindFirstChildOfClass("Tool")
+            if tool and tool:FindFirstChild("Ammo") then
+                return true
+            end
+        end
         local playerGui = LocalPlayer:FindFirstChildOfClass("PlayerGui")
         if playerGui then
             local aimGui = playerGui:FindFirstChild("Aim")
@@ -474,29 +498,30 @@ do
         end
         local mouse = LocalPlayer:GetMouse()
         if mouse.Icon == "rbxasset://SystemCursors/Cross" then return true end
-        local pm = LocalPlayer.PlayerScripts:FindFirstChild("PlayerModule")
-        if pm then
-            local cm = pm:FindFirstChild("CameraModule")
-            if cm then
-                local mlc = cm:FindFirstChild("MouseLockController")
-                if mlc then
-                    local iml = mlc:FindFirstChild("isMouseLocked")
-                    if iml and iml.Value then return true end
+        local playerModule = LocalPlayer.PlayerScripts:FindFirstChild("PlayerModule")
+        if playerModule then
+            local cameraModule = playerModule:FindFirstChild("CameraModule")
+            if cameraModule then
+                local mouseLockController = cameraModule:FindFirstChild("MouseLockController")
+                if mouseLockController then
+                    local isMouseLocked = mouseLockController:FindFirstChild("isMouseLocked")
+                    if isMouseLocked and isMouseLocked.Value then return true end
                 end
             end
         end
         return false
     end
 
-    -- position: every render frame, zero throttle
+    -- FOV circle position: every render frame, zero throttle = smooth
     RunService.RenderStepped:Connect(function()
         local fovCfg = SACfg["FOV"]
         FOVCircle.Visible = fovCfg["Enabled"] and fovCfg["Visible"]
         if not FOVCircle.Visible then return end
 
         if IsShiftLockActive() then
-            FOVCircle.Position = Vector2.new(Camera.ViewportSize.X * 0.5, Camera.ViewportSize.Y * 0.5)
-            LastMousePosition  = FOVCircle.Position
+            local centerScreen = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+            FOVCircle.Position = centerScreen
+            LastMousePosition  = centerScreen
         else
             local mp = UserInputService:GetMouseLocation()
             FOVCircle.Position = mp
@@ -504,23 +529,24 @@ do
         end
     end)
 
-    -- radius + target: throttled
-    local LastLogicStep = 0
-    RunService.Heartbeat:Connect(function(dt)
-        LastLogicStep = LastLogicStep + dt
-        if LastLogicStep < 0.05 then return end
-        LastLogicStep = 0
+    -- radius + target finding: throttled
+    local LastFOVUpdate    = 0
+    local FOVUpdateInterval = 0.033
+    RunService.Heartbeat:Connect(function(deltaTime)
+        LastFOVUpdate = LastFOVUpdate + deltaTime
+        if LastFOVUpdate < FOVUpdateInterval then return end
+        LastFOVUpdate = 0
 
-        local fovCfg      = SACfg["FOV"]
+        local fovConfig   = SACfg["FOV"]
         local currentTool = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Tool")
-        local radius      = fovCfg["Size"] * 5
+        local radius      = fovConfig["Size"] * 5
 
-        if fovCfg["Weapons"]["Enabled"] and currentTool then
-            local wn = string.lower(currentTool.Name or "")
-            if string.find(wn, "shotgun") then
-                radius = fovCfg["Weapons"]["Shotguns"] * 5
-            elseif string.find(wn, "pistol") then
-                radius = fovCfg["Weapons"]["Pistols"] * 5
+        if fovConfig["Weapons"]["Enabled"] and currentTool then
+            local weaponName = string.lower(currentTool.Name or "")
+            if string.find(weaponName, "shotgun") then
+                radius = fovConfig["Weapons"]["Shotguns"] * 5
+            elseif string.find(weaponName, "pistol") then
+                radius = fovConfig["Weapons"]["Pistols"] * 5
             end
         end
 
@@ -529,18 +555,22 @@ do
             FOVCircle.Radius = radius
         end
 
-        local bestPart, bestDist = nil, math.huge
+        local bestPart, bestDistance = nil, math.huge
         for _, player in pairs(Players:GetPlayers()) do
             if player ~= LocalPlayer and player.Character then
-                local targetPart = SACfg["Hit Part"] == "Closest Point"
-                    and GetClosestPoint(player)
-                    or player.Character:FindFirstChild(SACfg["Hit Part"] or "Head")
+                local targetPart = nil
+                if SACfg["Hit Part"] == "Closest Point" then
+                    targetPart = GetClosestPoint(player)
+                else
+                    targetPart = player.Character:FindFirstChild(SACfg["Hit Part"] or "Head")
+                end
                 if targetPart then
-                    local sp, on = Camera:WorldToViewportPoint(targetPart.Position)
-                    if on and sp.Z > 0 then
-                        local d = (LastMousePosition - Vector2.new(sp.X, sp.Y)).Magnitude
-                        if d < bestDist and d <= radius then
-                            bestPart, bestDist = targetPart, d
+                    local screenPosition, onScreen = Camera:WorldToViewportPoint(targetPart.Position)
+                    if onScreen and screenPosition.Z > 0 then
+                        local pointPosition = Vector2.new(screenPosition.X, screenPosition.Y)
+                        local distance = (LastMousePosition - pointPosition).Magnitude
+                        if distance < bestDistance and distance <= radius then
+                            bestPart, bestDistance = targetPart, distance
                         end
                     end
                 end
@@ -561,34 +591,40 @@ do
             metatable.__index = newcclosure(function(object, property)
                 if object:IsA("Mouse") and (property == "Hit" or property == "Target") then
                     local target = CurrentTarget
-                    if target then
-                        local pred = SACfg["Prediction"]
-                        local redir = SACfg["Client Redirect"]
-                        local currentTool = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Tool")
-                        if redir["Enabled"] and currentTool then
-                            for _, weapon in ipairs(redir["Weapons"]) do
-                                if string.find(string.lower(tostring(currentTool.Name)), string.lower(weapon)) then
-                                    pred = redir["Prediction"]; break
+                    if target and SilentAimActive then
+                        local prediction = SACfg["Prediction"]
+                        local redirection = SACfg["Client Redirect"]
+                        local currentTool = (LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Tool")) or nil
+                        if redirection["Enabled"] and currentTool then
+                            local toolName = tostring(currentTool.Name)
+                            for _, weapon in ipairs(redirection["Weapons"]) do
+                                if string.find(string.lower(toolName), string.lower(weapon)) then
+                                    prediction = redirection["Prediction"]
+                                    break
                                 end
                             end
                         end
-                        local offset = target.Velocity * Vector3.new(pred["X"], pred["Y"], pred["Z"])
-                        if property == "Hit" then return ApplyPrediction(target.CFrame, offset)
-                        else return target end
+                        local predictionMultiplier = Vector3.new(prediction["X"], prediction["Y"], prediction["Z"])
+                        local offset = target.Velocity * predictionMultiplier
+                        if property == "Hit" then
+                            return ApplyPrediction(target.CFrame, offset)
+                        else
+                            return target
+                        end
                     end
                 end
                 return oldIndex(object, property)
             end)
         end)
         if success then
-            print("[Silent Aim] Metatable hooking enabled")
+            print("[Silent Aim] Metatable hooking enabled with shiftlock fix")
         else
-            warn("[Silent Aim] Metatable hooking failed")
+            warn("[Silent Aim] Metatable hooking failed, using basic mode")
             ShowNotification("Silent Aim", "basic mode", 4)
         end
     else
-        warn("[Silent Aim] Not supported on this executor")
-        ShowNotification("Silent Aim", "limited mode", 4)
+        warn("[Silent Aim] Metatable hooking not supported on this executor")
+        ShowNotification("Silent Aim", "limited mode (no metatable)", 4)
     end
 end
 
