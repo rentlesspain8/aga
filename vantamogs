@@ -196,6 +196,19 @@ RunService.Heartbeat:Connect(RefreshESP)
 -- viewportSize.Y - 120, each label adds 15px down).
 -- ============================================================================
 
+-- Clear any orphaned Drawing objects from previous script runs
+pcall(function()
+    for _, d in pairs(Drawing.getDrawings and Drawing.getDrawings() or {}) do
+        if d and d.Text and type(d.Text) == "string" and
+           (d.Text:find("font color") or d.Text:find("Silent Aim") or
+            d.Text:find("Trigger Bot") or d.Text:find("WalkSpeed") or
+            d.Text:find("DoubleTap") or d.Text:find("Cam Lock") or
+            d.Text:find("Vyron")) then
+            pcall(function() d:Remove() end)
+        end
+    end
+end)
+
 -- runtime toggle states (flipped by each feature's keybind handlers)
 local VyronState = {
     SilentAim  = false,
