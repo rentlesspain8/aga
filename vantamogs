@@ -189,74 +189,105 @@ Players.PlayerRemoving:Connect(RemoveESP)
 RunService.Heartbeat:Connect(RefreshESP)
 
 -- ============================================================================
--- HOTKEY LABELS  (bottom-of-screen HUD showing active feature states)
--- Reads CFG()["General"]["Show Hotkeys"] — set false to hide entirely
+-- HOTKEY LABELS  (exact port of Script:UpdateLabels() from reference)
+-- Only shows a label when that feature is actively toggled ON.
+-- Labels stack downward from the bottom-center of the screen.
+-- Reads CFG()["General"]["Show Hotkeys"] — set false to hide entirely.
 -- ============================================================================
-local HotkeyLabels = {}  -- pool of Drawing Text objects
 
--- runtime state refs (set by each feature's keybind handler below)
-local HKState = {
-    SilentAim   = false,
-    CamLock     = false,  -- mirrors CamLocked
-    TriggerBot  = false,
-    Speed       = false,
-    DoubleTap   = false,
-}
+-- five label slots, lazily created (mirrors LabelOne..LabelFive)
+local VyronLabels = { nil, nil, nil, nil, nil }
 
-local LABEL_COLOR_ACTIVE   = Color3.fromRGB(143, 174, 211)
-local LABEL_COLOR_INACTIVE = Color3.fromRGB(120, 120, 120)
-local LABEL_SIZE           = 13
-local LABEL_BOTTOM_OFFSET  = 80   -- pixels up from the very bottom edge
-
-local function GetOrCreateLabel(index)
-    if not HotkeyLabels[index] then
+local function VyronNewLabel(i)
+    if VyronLabels[i] == nil then
         local t = Drawing.new("Text")
         t.Visible  = false
         t.Center   = true
         t.Outline  = true
         t.Font     = Drawing.Fonts.UI
-        t.Size     = LABEL_SIZE
-        t.ZIndex   = 999
-        HotkeyLabels[index] = t
+        t.Size     = 13
+        t.ZIndex   = 1000
+        VyronLabels[i] = t
     end
-    return HotkeyLabels[index]
+    return VyronLabels[i]
 end
 
-local function UpdateHotkeyLabels()
+-- runtime toggle states (flipped by each feature's keybind handler)
+local VyronState = {
+    SilentAim  = false,   -- SATarget locked
+    TriggerBot = false,   -- TBActive
+    Speed      = false,   -- speedOn (set via VyronState.Speed below)
+    DoubleTap  = false,   -- DTActive
+    CamLock    = false,   -- CamLocked mirror
+}
+
+local function UpdateVyronLabels()
     if not CFG()["General"]["Show Hotkeys"] then
-        for _, lbl in pairs(HotkeyLabels) do lbl.Visible = false end
+        for i = 1, 5 do
+            if VyronLabels[i] then VyronLabels[i].Visible = false end
+        end
         return
     end
 
-    -- build list of entries: { text, active }
-    local entries = {
-        { text = "Silent Aim  [" .. CFG()["General"]["Binds"]["Silent Aim"]   .. "]", active = HKState.SilentAim  },
-        { text = "Cam Lock    [" .. CFG()["General"]["Binds"]["Camera Lock"]  .. "]", active = HKState.CamLock    },
-        { text = "Trigger Bot [" .. CFG()["General"]["Binds"]["Trigger Bot"]  .. "]", active = HKState.TriggerBot and CFG()["Trigger Bot"]["Enabled"] },
-        { text = "Speed       [" .. CFG()["General"]["Binds"]["Speed"]        .. "]", active = HKState.Speed      and CFG()["Player Modifications"]["Speed"]["Enabled"] },
-        { text = "Double Tap  [" .. CFG()["General"]["Binds"]["Double Tap"]   .. "]", active = HKState.DoubleTap  and CFG()["Weapon Modifications"]["Double Tap"]["Enabled"] },
-    }
-
-    local vp     = Camera.ViewportSize
-    local totalH = #entries * (LABEL_SIZE + 4)
-    local startY = vp.Y - LABEL_BOTTOM_OFFSET - totalH
+    local vp      = Camera.ViewportSize
+    -- anchor: bottom-center, 80px up from the bottom, labels stack upward
+    local baseY   = vp.Y - 80
     local centerX = vp.X / 2
+    local slot    = 0   -- counts how many labels are visible this frame
 
-    for i, entry in ipairs(entries) do
-        local lbl = GetOrCreateLabel(i)
-        lbl.Text     = entry.text
-        lbl.Color    = entry.active and LABEL_COLOR_ACTIVE or LABEL_COLOR_INACTIVE
-        lbl.Position = Vector2.new(centerX, startY + (i - 1) * (LABEL_SIZE + 4))
+    local function ShowLabel(idx, text)
+        local lbl = VyronNewLabel(idx)
+        lbl.Color    = Color3.fromRGB(143, 174, 211)
+        lbl.Outline  = true
+        lbl.Size     = 13
+        lbl.Center   = true
         lbl.Visible  = true
+        lbl.Text     = text
+        lbl.Position = Vector2.new(centerX, baseY - slot * 15)
+        slot = slot + 1
     end
 
-    -- hide any extras from a previous longer list
-    for i = #entries + 1, #HotkeyLabels do
-        HotkeyLabels[i].Visible = false
+    -- Silent Aim — show with target name when locked, plain when just toggled on
+    if CFG()["Silent Aim"]["Enabled"] and VyronState.SilentAim then
+        if SATarget then
+            ShowLabel(1, '<font color="rgb(143,174,211)">Silent Aim</font> <font color="rgb(255,100,100)">(' .. SATarget.DisplayName .. ')</font>')
+        else
+            ShowLabel(1, '<font color="rgb(143,174,211)">Silent Aim</font> <font color="rgb(255,100,100)">(N/A)</font>')
+        end
+    else
+        if VyronLabels[1] then VyronLabels[1].Visible = false end
+    end
+
+    -- Trigger Bot
+    if CFG()["Trigger Bot"]["Enabled"] and TBActive then
+        ShowLabel(2, '<font color="rgb(143,174,211)">Trigger Bot</font>')
+    else
+        if VyronLabels[2] then VyronLabels[2].Visible = false end
+    end
+
+    -- Speed
+    if CFG()["Player Modifications"]["Speed"]["Enabled"] and VyronState.Speed then
+        ShowLabel(3, '<font color="rgb(143,174,211)">WalkSpeed</font>')
+    else
+        if VyronLabels[3] then VyronLabels[3].Visible = false end
+    end
+
+    -- Double Tap
+    if CFG()["Weapon Modifications"]["Double Tap"]["Enabled"] and VyronState.DoubleTap then
+        ShowLabel(4, '<font color="rgb(143,174,211)">Double Tap</font>')
+    else
+        if VyronLabels[4] then VyronLabels[4].Visible = false end
+    end
+
+    -- Camera Lock
+    if CFG()["Camera Lock"]["Enabled"] and VyronState.CamLock then
+        ShowLabel(5, '<font color="rgb(143,174,211)">Cam Lock</font>')
+    else
+        if VyronLabels[5] then VyronLabels[5].Visible = false end
     end
 end
 
-RunService.RenderStepped:Connect(UpdateHotkeyLabels)
+RunService.RenderStepped:Connect(UpdateVyronLabels)
 
 -- ============================================================================
 -- TRIGGER BOT  (only runs if shared.Vyron["Trigger Bot"]["Enabled"] == true)
@@ -310,7 +341,7 @@ UserInputService.InputBegan:Connect(function(input,gp)
     if input.KeyCode==Enum.KeyCode[bind] then
         if CFG()["Trigger Bot"]["Type"]=="Toggle" then
             TBActive=not TBActive
-            HKState.TriggerBot = TBActive
+            VyronState.TriggerBot = TBActive
             ShowNotification("Trigger Bot", TBActive and "on" or "off", 2)
         end
     end
@@ -382,7 +413,7 @@ UserInputService.InputBegan:Connect(function(input,gp)
     -- (silent aim handler below will check the same and skip if cam lock consumed it)
     if CamLocked then
         CamLocked=false; CamTarget=nil
-        HKState.CamLock = false
+        VyronState.CamLock = false
     else
         local clCfg=CFG()["Camera Lock"]
         local fovCfg=clCfg["FOV"] or {}
@@ -405,7 +436,7 @@ UserInputService.InputBegan:Connect(function(input,gp)
         end
         if best then
             CamLocked=true; CamTarget=best
-            HKState.CamLock = true
+            VyronState.CamLock = true
         end
     end
 end)
@@ -432,7 +463,7 @@ RunService.RenderStepped:Connect(function()
     -- validate target still alive
     local char=CamTarget.Parent
     if not char or IsKnockedOut(char) then
-        CamLocked=false; CamTarget=nil; HKState.CamLock=false; return
+        CamLocked=false; CamTarget=nil; VyronState.CamLock=false; return
     end
 
     -- prediction: offset aim point by target velocity
@@ -563,7 +594,7 @@ UserInputService.InputBegan:Connect(function(input,gp)
     if input.KeyCode~=Enum.KeyCode[bind] then return end
     if SATarget then
         SATarget=nil; SAActive=false
-        HKState.SilentAim = false
+        VyronState.SilentAim = false
     else
         local best,bd=nil,math.huge
         local mp=UserInputService:GetMouseLocation()
@@ -582,7 +613,7 @@ UserInputService.InputBegan:Connect(function(input,gp)
         end
         if best then
             SATarget=best; SAActive=true
-            HKState.SilentAim = true
+            VyronState.SilentAim = true
         end
     end
 end)
@@ -673,7 +704,7 @@ do
             local bind=CFG()["General"]["Binds"]["Speed"] or "X"
             if input.KeyCode==Enum.KeyCode[bind:upper()] then
                 speedOn=not speedOn
-                HKState.Speed = speedOn
+                VyronState.Speed = speedOn
                 if not speedOn and hum then hum.WalkSpeed=16 end
             end
         end)
@@ -731,7 +762,7 @@ do
         local bind = CFG()["General"]["Binds"]["Double Tap"]:upper()
         if input.KeyCode == Enum.KeyCode[bind] then
             DTActive = not DTActive
-            HKState.DoubleTap = DTActive
+            VyronState.DoubleTap = DTActive
             ShowNotification("Double Tap", DTActive and "on" or "off", 2)
         end
     end)
