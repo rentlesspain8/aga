@@ -226,10 +226,6 @@ local LabelThree    = nil
 local LabelFour     = nil
 local LabelFive     = nil
 local LabelFiveSub  = nil  -- green target name for Cam Lock
-local LabelTwo   = nil
-local LabelThree = nil
-local LabelFour  = nil
-local LabelFive  = nil
 
 local function MakeLabel()
     local t = Drawing.new("Text")
@@ -237,7 +233,7 @@ local function MakeLabel()
     t.Center  = true
     t.Outline = true
     t.Font    = Drawing.Fonts.UI
-    t.Size    = 14
+    t.Size    = 13
     t.ZIndex  = 1000
     t.Color   = Color3.fromRGB(255, 255, 255)
     return t
@@ -256,7 +252,7 @@ local function UpdateLabels()
         return
     end
 
-    -- lazy-create labels (same pattern as reference LabelOne..LabelFive)
+    -- lazy-create labels
     if LabelTitle   == nil then LabelTitle   = MakeLabel() end
     if LabelOne     == nil then LabelOne     = MakeLabel() end
     if LabelOneSub  == nil then LabelOneSub  = MakeLabel() end
@@ -265,45 +261,39 @@ local function UpdateLabels()
     if LabelFour    == nil then LabelFour    = MakeLabel() end
     if LabelFive    == nil then LabelFive    = MakeLabel() end
     if LabelFiveSub == nil then LabelFiveSub = MakeLabel() end
-    if LabelTwo   == nil then LabelTwo   = MakeLabel() end
-    if LabelThree == nil then LabelThree = MakeLabel() end
-    if LabelFour  == nil then LabelFour  = MakeLabel() end
-    if LabelFive  == nil then LabelFive  = MakeLabel() end
 
     local vp      = Camera.ViewportSize
-    -- anchor higher up from the bottom
     local offsetY = vp.Y - 160
 
-    -- "Vyron.cc" header — always visible when Show Hotkeys is on
+    -- "Vyron.cc" header
     LabelTitle.Color    = Color3.fromRGB(255, 255, 255)
     LabelTitle.Outline  = true
-    LabelTitle.Size     = 24
+    LabelTitle.Size     = 13
     LabelTitle.Center   = true
     LabelTitle.Visible  = true
     LabelTitle.Text     = 'Vyron.cc'
     LabelTitle.Position = Vector2.new(vp.X / 2, offsetY)
-    offsetY = offsetY + 30
+    offsetY = offsetY + 18
 
     -- Silent Aim (label 1)
     if CFG()["Silent Aim"]["Enabled"] and VyronState.SilentAim then
         LabelOne.Color    = Color3.fromRGB(255, 255, 255)
         LabelOne.Outline  = true
-        LabelOne.Size     = 24
+        LabelOne.Size     = 13
         LabelOne.Center   = true
         LabelOne.Visible  = true
         LabelOne.Text     = 'Silent Aim'
         LabelOne.Position = Vector2.new(vp.X / 2, offsetY)
-
+        -- at size 13, "Silent Aim" ≈ 70px wide, half = 35; sub goes right after with 4px gap
         local targetName = SATarget and ('(' .. SATarget.DisplayName .. ')') or '(N/A)'
-        -- "Silent Aim" = 10 chars * ~14px/char at size 24 = ~140px wide, half = 70
         LabelOneSub.Color    = Color3.fromRGB(0, 255, 0)
         LabelOneSub.Outline  = true
-        LabelOneSub.Size     = 24
+        LabelOneSub.Size     = 13
         LabelOneSub.Center   = false
         LabelOneSub.Visible  = true
         LabelOneSub.Text     = targetName
-        LabelOneSub.Position = Vector2.new(vp.X / 2 + 72, offsetY)
-        offsetY = offsetY + 30
+        LabelOneSub.Position = Vector2.new(vp.X / 2 + 39, offsetY)
+        offsetY = offsetY + 18
     else
         LabelOne.Visible    = false
         LabelOneSub.Visible = false
@@ -311,69 +301,69 @@ local function UpdateLabels()
 
     -- Trigger Bot (label 2)
     if CFG()["Trigger Bot"]["Enabled"] and TBActive then
-        LabelTwo.Color   = Color3.fromRGB(255, 255, 255)
-        LabelTwo.Outline = true
-        LabelTwo.Size    = 24
-        LabelTwo.Center  = true
-        LabelTwo.Visible = true
-        LabelTwo.Text    = 'Trigger Bot'
+        LabelTwo.Color    = Color3.fromRGB(255, 255, 255)
+        LabelTwo.Outline  = true
+        LabelTwo.Size     = 13
+        LabelTwo.Center   = true
+        LabelTwo.Visible  = true
+        LabelTwo.Text     = 'Trigger Bot'
         LabelTwo.Position = Vector2.new(vp.X / 2, offsetY)
-        offsetY = offsetY + 30
+        offsetY = offsetY + 18
     else
         LabelTwo.Visible = false
     end
 
     -- WalkSpeed (label 3)
     if CFG()["Player Modifications"]["Speed"]["Enabled"] and VyronState.Speed then
-        LabelThree.Color   = Color3.fromRGB(255, 255, 255)
-        LabelThree.Outline = true
-        LabelThree.Size    = 24
-        LabelThree.Center  = true
-        LabelThree.Visible = true
-        LabelThree.Text    = 'WalkSpeed'
+        LabelThree.Color    = Color3.fromRGB(255, 255, 255)
+        LabelThree.Outline  = true
+        LabelThree.Size     = 13
+        LabelThree.Center   = true
+        LabelThree.Visible  = true
+        LabelThree.Text     = 'WalkSpeed'
         LabelThree.Position = Vector2.new(vp.X / 2, offsetY)
-        offsetY = offsetY + 30
+        offsetY = offsetY + 18
     else
         LabelThree.Visible = false
     end
 
     -- Double Tap (label 4)
     if CFG()["Weapon Modifications"]["Double Tap"]["Enabled"] and VyronState.DoubleTap then
-        LabelFour.Color   = Color3.fromRGB(255, 255, 255)
-        LabelFour.Outline = true
-        LabelFour.Size    = 24
-        LabelFour.Center  = true
-        LabelFour.Visible = true
-        LabelFour.Text    = 'Double Tap'
+        LabelFour.Color    = Color3.fromRGB(255, 255, 255)
+        LabelFour.Outline  = true
+        LabelFour.Size     = 13
+        LabelFour.Center   = true
+        LabelFour.Visible  = true
+        LabelFour.Text     = 'Double Tap'
         LabelFour.Position = Vector2.new(vp.X / 2, offsetY)
-        offsetY = offsetY + 30
+        offsetY = offsetY + 18
     else
         LabelFour.Visible = false
     end
 
     -- Camera Lock (label 5)
     if CFG()["Camera Lock"]["Enabled"] and VyronState.CamLock then
-        LabelFive.Color   = Color3.fromRGB(255, 255, 255)
-        LabelFive.Outline = true
-        LabelFive.Size    = 24
-        LabelFive.Center  = true
-        LabelFive.Visible = true
-        LabelFive.Text    = 'Cam Lock'
+        LabelFive.Color    = Color3.fromRGB(255, 255, 255)
+        LabelFive.Outline  = true
+        LabelFive.Size     = 13
+        LabelFive.Center   = true
+        LabelFive.Visible  = true
+        LabelFive.Text     = 'Cam Lock'
         LabelFive.Position = Vector2.new(vp.X / 2, offsetY)
         if CamTarget and CamTarget.Parent then
             local camName = '(' .. (CamTarget.Parent.DisplayName or CamTarget.Parent.Name) .. ')'
             LabelFiveSub.Color    = Color3.fromRGB(0, 255, 0)
             LabelFiveSub.Outline  = true
-            LabelFiveSub.Size     = 24
+            LabelFiveSub.Size     = 13
             LabelFiveSub.Center   = false
             LabelFiveSub.Visible  = true
             LabelFiveSub.Text     = camName
-            -- "Cam Lock" = 8 chars * ~14px = ~112px wide, half = 56
-            LabelFiveSub.Position = Vector2.new(vp.X / 2 + 58, offsetY)
+            -- "Cam Lock" ≈ 56px wide, half = 28; sub goes right after
+            LabelFiveSub.Position = Vector2.new(vp.X / 2 + 32, offsetY)
         else
             LabelFiveSub.Visible = false
         end
-        offsetY = offsetY + 30
+        offsetY = offsetY + 18
     else
         LabelFive.Visible    = false
         LabelFiveSub.Visible = false
