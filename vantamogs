@@ -580,25 +580,24 @@ end
 -- RAPID FIRE  (hold mouse1 to shoot fast — shared.MoozeV2["Weapon Modifications"]["Rapid Fire"]["Enabled"] == true)
 -- ============================================================================
 do
-    local rf=CFG()["Weapon Modifications"]["Rapid Fire"]
-    if rf["Enabled"] then
-        local isMouseDown=false
-        UserInputService.InputBegan:Connect(function(i,gp)
-            if not gp and i.UserInputType==Enum.UserInputType.MouseButton1 then isMouseDown=true end
-        end)
-        UserInputService.InputEnded:Connect(function(i,gp)
-            if not gp and i.UserInputType==Enum.UserInputType.MouseButton1 then isMouseDown=false end
-        end)
-        task.spawn(function()
-            while true do
-                if isMouseDown then
-                    local tool=LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Tool")
-                    if tool then tool:Activate() end
-                end
-                task.wait(CFG()["Weapon Modifications"]["Rapid Fire"]["Cooldown"] or 0.001)
+    local isMouseDown=false
+    UserInputService.InputBegan:Connect(function(i,gp)
+        if not gp and i.UserInputType==Enum.UserInputType.MouseButton1 then isMouseDown=true end
+    end)
+    UserInputService.InputEnded:Connect(function(i,gp)
+        if not gp and i.UserInputType==Enum.UserInputType.MouseButton1 then isMouseDown=false end
+    end)
+    task.spawn(function()
+        while true do
+            local rfCfg=CFG()["Weapon Modifications"]["Rapid Fire"]
+            if rfCfg["Enabled"] and isMouseDown then
+                local tool=LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Tool")
+                if tool then tool:Activate() end
             end
-        end)
-    end
+            local cd=rfCfg and rfCfg["Cooldown"] or 0
+            task.wait(cd > 0 and cd or nil)
+        end
+    end)
 end
 
 print("[Mooze] Loaded. Executor: "..ExecutorName)
