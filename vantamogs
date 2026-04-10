@@ -404,172 +404,330 @@ RunService.RenderStepped:Connect(function()
 end)
 
 -- ============================================================================
--- SILENT AIM  (only active if shared.MoozeV2["Silent Aim"]["Enabled"] == true)
+-- SILENT AIM
 -- ============================================================================
-local SACurrentTarget = nil  -- the body part being aimed at
-local SALastMousePos  = Vector2.new(0,0)
+
+-- Runtime state
+local SACurrentTarget = nil  -- BasePart being aimed at
+local SALastMousePos  = Vector2.new(0, 0)
 local SALastUpdate    = 0
+local isMouseDown     = false  -- only redirect during actual shots
 
+-- Track mouse button state
+UserInputService.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        isMouseDown = true
+    end
+end)
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        isMouseDown = false
+    end
+end)
+
+-- FOV circle
 local SACircle = Drawing.new("Circle")
-SACircle.Transparency=1; SACircle.Thickness=1.5; SACircle.Color=Color3.new(1,1,1)
-SACircle.NumSides=128; SACircle.Filled=false
-SACircle.Radius=CFG()["Silent Aim"]["FOV"]["Size"]*5
-SACircle.Visible=CFG()["Silent Aim"]["Enabled"] and CFG()["Silent Aim"]["FOV"]["Enabled"] and CFG()["Silent Aim"]["FOV"]["Visible"]
+SACircle.Transparency = 1
+SACircle.Thickness    = 1.5
+SACircle.Color        = Color3.new(1, 1, 1)
+SACircle.NumSides     = 128
+SACircle.Filled       = false
+SACircle.Radius       = CFG()["Silent Aim"]["FOV"]["Size"] * 5
+SACircle.Visible      = false
 
-local function SAIsShiftLock()
+-- Detect ADS / shiftlock so FOV circle snaps to center
+local function SAIsADS()
     if LocalPlayer.Character then
-        local tool=LocalPlayer.Character:FindFirstChildOfClass("Tool")
+        local tool = LocalPlayer.Character:FindFirstChildOfClass("Tool")
         if tool and tool:FindFirstChild("Ammo") then return true end
     end
-    local pg=LocalPlayer:FindFirstChildOfClass("PlayerGui")
-    if pg then local ag=pg:FindFirstChild("Aim"); if ag and ag.Visible then return true end end
-    local mouse=LocalPlayer:GetMouse()
-    if mouse.Icon=="rbxasset://SystemCursors/Cross" then return true end
-    local pm=LocalPlayer.PlayerScripts:FindFirstChild("PlayerModule")
+    local pg = LocalPlayer:FindFirstChildOfClass("PlayerGui")
+    if pg then
+        local ag = pg:FindFirstChild("Aim")
+        if ag and ag.Visible then return true end
+    end
+    if LocalPlayer:GetMouse().Icon == "rbxasset://SystemCursors/Cross" then return true end
+    local pm = LocalPlayer.PlayerScripts:FindFirstChild("PlayerModule")
     if pm then
-        local cm=pm:FindFirstChild("CameraModule")
+        local cm = pm:FindFirstChild("CameraModule")
         if cm then
-            local mlc=cm:FindFirstChild("MouseLockController")
-            if mlc then local iml=mlc:FindFirstChild("isMouseLocked"); if iml and iml.Value then return true end end
+            local mlc = cm:FindFirstChild("MouseLockController")
+            if mlc then
+                local iml = mlc:FindFirstChild("isMouseLocked")
+                if iml and iml.Value then return true end
+            end
         end
     end
     return false
 end
 
-local function SAGetClosestPoint(player)
-    local best,bd=nil,math.huge
-    local scale=(CFG()["Silent Aim"]["Closest Point"] or {})["Scale"] or 1.0
-    if player.Character then
-        for _,part in ipairs(GetBodyParts(player.Character)) do
-            local sp,on=Camera:WorldToViewportPoint(part.Position)
-            if on and sp.Z>0 then
-                local d=(SALastMousePos-Vector2.new(sp.X,sp.Y)).Magnitude*scale
-                if d<bd then best=part; bd=d end
-            end
-        end
-    end
-    return best
+-- Get predicted world position accounting for velocity + ping
+local function SAPredictedPos(part)
+    local saCfg = CFG()["Silent Aim"]
+    local pred  = saCfg["Prediction"]
+    local vel   = part.AssemblyLinearVelocity or part.Velocity or Vector3.new()
+    -- ping-scaled lead: estimate round-trip time
+    local ping  = 0.05
+    pcall(function()
+        ping = game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValue() / 1000
+        if ping < 0.01 then ping = 0.03 end
+    end)
+    return part.Position
+        + Vector3.new(vel.X * pred["X"], vel.Y * pred["Y"], vel.Z * pred["Z"])
+        + vel * ping
 end
 
--- FOV circle: every render frame, zero throttle
+-- For spread weapons force center-mass, otherwise use config hit part
+local function SAGetTargetPart(player)
+    if not player.Character then return nil end
+    local saCfg = CFG()["Silent Aim"]
+    local tool  = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Tool")
+    local name  = tool and string.lower(tool.Name) or ""
+    -- shotguns/double barrel: always HumanoidRootPart for reliability
+    local isSpread = string.find(name,"shotgun") or string.find(name,"double")
+        or string.find(name,"tac") or string.find(name,"db")
+    if isSpread then
+        return player.Character:FindFirstChild("HumanoidRootPart")
+            or player.Character:FindFirstChild("UpperTorso")
+    end
+    local hp = saCfg["Hit Part"]
+    if hp == "Closest Point" then
+        -- find body part with smallest screen distance to mouse
+        local best, bd = nil, math.huge
+        local scale = (saCfg["Closest Point"] or {})["Scale"] or 1.0
+        for _, part in ipairs(GetBodyParts(player.Character)) do
+            local sp, on = Camera:WorldToViewportPoint(part.Position)
+            if on and sp.Z > 0 then
+                local d = (SALastMousePos - Vector2.new(sp.X, sp.Y)).Magnitude * scale
+                if d < bd then best = part; bd = d end
+            end
+        end
+        return best
+    end
+    return player.Character:FindFirstChild(hp)
+        or player.Character:FindFirstChild("HumanoidRootPart")
+end
+
+-- FOV circle position: every render frame, zero throttle = smooth
 RunService.RenderStepped:Connect(function()
-    local saCfg=CFG()["Silent Aim"]
-    local fovCfg=saCfg["FOV"]
+    local saCfg  = CFG()["Silent Aim"]
+    local fovCfg = saCfg["FOV"]
     SACircle.Visible = saCfg["Enabled"] and fovCfg["Enabled"] and fovCfg["Visible"]
     if not SACircle.Visible then return end
-    if SAIsShiftLock() then
-        local c=Vector2.new(Camera.ViewportSize.X*0.5,Camera.ViewportSize.Y*0.5)
-        SACircle.Position=c; SALastMousePos=c
+    if SAIsADS() then
+        local c = Vector2.new(Camera.ViewportSize.X * 0.5, Camera.ViewportSize.Y * 0.5)
+        SACircle.Position = c; SALastMousePos = c
     else
-        local mp=UserInputService:GetMouseLocation()
-        SACircle.Position=mp; SALastMousePos=mp
+        local mp = UserInputService:GetMouseLocation()
+        SACircle.Position = mp; SALastMousePos = mp
     end
 end)
 
--- Target finding: throttled
+-- Target finding: throttled to ~30fps (no need faster)
 RunService.Heartbeat:Connect(function(dt)
-    SALastUpdate=SALastUpdate+dt
-    if SALastUpdate<0.033 then return end; SALastUpdate=0
-    local saCfg=CFG()["Silent Aim"]
-    if not saCfg["Enabled"] then SACurrentTarget=nil; return end
+    SALastUpdate = SALastUpdate + dt
+    if SALastUpdate < 0.033 then return end
+    SALastUpdate = 0
 
-    local fovCfg=saCfg["FOV"]
-    local radius=fovCfg["Size"]*5
+    local saCfg  = CFG()["Silent Aim"]
+    if not saCfg["Enabled"] then SACurrentTarget = nil; return end
+
+    -- update FOV radius (weapon-specific overrides)
+    local fovCfg = saCfg["FOV"]
+    local radius = fovCfg["Size"] * 5
     if fovCfg["Weapons"]["Enabled"] then
-        local tool=LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Tool")
+        local tool = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Tool")
         if tool then
-            local wn=string.lower(tool.Name or "")
-            if string.find(wn,"shotgun") then radius=fovCfg["Weapons"]["Shotguns"]*5
-            elseif string.find(wn,"pistol") then radius=fovCfg["Weapons"]["Pistols"]*5 end
+            local wn = string.lower(tool.Name or "")
+            if string.find(wn, "shotgun") then radius = fovCfg["Weapons"]["Shotguns"] * 5
+            elseif string.find(wn, "pistol") then radius = fovCfg["Weapons"]["Pistols"] * 5 end
         end
     end
-    SACircle.Radius=radius
+    SACircle.Radius = radius
 
-    -- if we have a locked target, only aim at them
+    -- locked target: only aim at them
     if SATarget then
         if PlayerDead(SATarget) or PlayerKnocked(SATarget) then
-            SATarget=nil; SAActive=false
-            ShowNotification("Silent Aim","target lost",2); SACurrentTarget=nil; return
+            SATarget = nil; SAActive = false
+            ShowNotification("Silent Aim", "target lost", 2)
+            SACurrentTarget = nil; return
         end
-        local hp=saCfg["Hit Part"]
-        local part = hp=="Closest Point" and SAGetClosestPoint(SATarget)
-            or SATarget.Character and SATarget.Character:FindFirstChild(hp or "Head")
-        SACurrentTarget=part; return
+        SACurrentTarget = SAGetTargetPart(SATarget)
+        return
     end
 
-    SACurrentTarget=nil
+    SACurrentTarget = nil
 end)
 
 -- Keybind: press to lock nearest in FOV, press again to unlock
-UserInputService.InputBegan:Connect(function(input,gp)
+UserInputService.InputBegan:Connect(function(input, gp)
     if gp then return end
-    if not CFG()["Silent Aim"]["Enabled"] then return end  -- master switch
-    local bind=CFG()["General"]["Binds"]["Silent Aim"]:upper()
-    if input.KeyCode~=Enum.KeyCode[bind] then return end
+    if not CFG()["Silent Aim"]["Enabled"] then return end
+    local bind = CFG()["General"]["Binds"]["Silent Aim"]:upper()
+    if input.KeyCode ~= Enum.KeyCode[bind] then return end
+
     if SATarget then
-        SATarget=nil; SAActive=false
-        ShowNotification("Silent Aim","untargeted",2)
+        SATarget = nil; SAActive = false
+        ShowNotification("Silent Aim", "untargeted", 2)
     else
-        local best,bd=nil,math.huge
-        local mp=UserInputService:GetMouseLocation()
-        local radius=CFG()["Silent Aim"]["FOV"]["Size"]*5
-        for _,p in ipairs(Players:GetPlayers()) do
-            if p~=LocalPlayer and p.Character and not PlayerDead(p) and not PlayerKnocked(p) then
-                local hrp=p.Character:FindFirstChild("HumanoidRootPart")
+        local best, bd = nil, math.huge
+        local mp     = UserInputService:GetMouseLocation()
+        local radius = CFG()["Silent Aim"]["FOV"]["Size"] * 5
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p ~= LocalPlayer and p.Character
+            and not PlayerDead(p) and not PlayerKnocked(p) then
+                local hrp = p.Character:FindFirstChild("HumanoidRootPart")
                 if hrp then
-                    local sp,on=Camera:WorldToViewportPoint(hrp.Position)
-                    if on and sp.Z>0 then
-                        local d=(Vector2.new(sp.X,sp.Y)-mp).Magnitude
-                        if d<=radius and d<bd then bd=d; best=p end
+                    local sp, on = Camera:WorldToViewportPoint(hrp.Position)
+                    if on and sp.Z > 0 then
+                        local d = (Vector2.new(sp.X, sp.Y) - mp).Magnitude
+                        if d <= radius and d < bd then bd = d; best = p end
                     end
                 end
             end
         end
         if best then
-            SATarget=best; SAActive=true
-            ShowNotification("Silent Aim","targeting "..best.Name,2)
+            SATarget = best; SAActive = true
+            ShowNotification("Silent Aim", "targeting " .. best.Name, 2)
         else
-            ShowNotification("Silent Aim","no target in FOV",2)
+            ShowNotification("Silent Aim", "no target in FOV", 2)
         end
     end
 end)
 
--- Metatable hook
+-- Helper: build a redirected CFrame toward the target
+local function SAGetAimData()
+    if not SAActive or not SACurrentTarget then return nil, nil end
+    local saCfg = CFG()["Silent Aim"]
+    if not saCfg["Enabled"] then return nil, nil end
+    local part = SACurrentTarget
+    if not part or not part.Parent then return nil, nil end
+    local pos   = SAPredictedPos(part)
+    local delta = pos - Camera.CFrame.Position
+    if delta.Magnitude < 1e-4 then return nil, nil end
+    return part, pos
+end
+
+local function SARedirectRay(origin, dir)
+    local part, pos = SAGetAimData()
+    if not pos then return origin, dir end
+    local nd = pos - origin
+    if nd.Magnitude < 1e-4 then return origin, dir end
+    return origin, nd.Unit * math.max(dir.Magnitude, nd.Magnitude)
+end
+
+-- ── HOOK 1: __index — spoof Mouse.Hit / Target / UnitRay / Origin
+--    Only active while mouse is held (isMouseDown) to avoid freezing crosshair
 if Capabilities[5] then
-    local ok=pcall(function()
-        local mt=getrawmetatable(game)
-        setreadonly(mt,false)
-        local oldIdx=mt.__index
-        mt.__index=newcclosure(function(obj,key)
-            if obj:IsA("Mouse") and (key=="Hit" or key=="Target") then
-                local saCfg=CFG()["Silent Aim"]
-                local target=SACurrentTarget
-                if target and SAActive and saCfg["Enabled"] then
-                    local pred=saCfg["Prediction"]
-                    local redir=saCfg["Client Redirect"]
-                    local tool=LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Tool")
-                    if redir["Enabled"] and tool then
-                        for _,w in ipairs(redir["Weapons"]) do
-                            if string.find(string.lower(tostring(tool.Name)),string.lower(w)) then
-                                pred=redir["Prediction"]; break
+    local ok = pcall(function()
+        local mt     = getrawmetatable(game)
+        local oldIdx = mt.__index
+        setreadonly(mt, false)
+        mt.__index = newcclosure(function(self, key)
+            if not checkcaller()
+            and self == LocalPlayer:GetMouse()
+            and isMouseDown then
+                if key == "Hit" or key == "Target"
+                or key == "UnitRay" or key == "Origin" then
+                    local part, pos = SAGetAimData()
+                    if part and pos then
+                        local dir = (pos - Camera.CFrame.Position).Unit
+                        if     key == "Hit"     then return CFrame.new(pos, pos + dir)
+                        elseif key == "Target"  then return part
+                        elseif key == "UnitRay" then return Ray.new(Camera.CFrame.Position, dir)
+                        elseif key == "Origin"  then return Camera.CFrame.Position end
+                    end
+                end
+            end
+            return oldIdx(self, key)
+        end)
+        setreadonly(mt, true)
+    end)
+    if ok then print("[SA] __index hook active")
+    else warn("[SA] __index hook failed") end
+end
+
+-- ── HOOK 2: __namecall — intercept FireServer / InvokeServer
+--    Replaces Vector3 / CFrame args that look like world positions
+if Capabilities[5] then
+    local ok = pcall(function()
+        local mt          = getrawmetatable(game)
+        local oldNamecall = mt.__namecall
+        setreadonly(mt, false)
+        mt.__namecall = newcclosure(function(self, ...)
+            local method = getnamecallmethod()
+            if not checkcaller()
+            and (method == "FireServer" or method == "InvokeServer") then
+                local part, pos = SAGetAimData()
+                if pos then
+                    local args = { ... }
+                    for i, arg in ipairs(args) do
+                        if typeof(arg) == "Vector3" then
+                            local dist = (arg - Camera.CFrame.Position).Magnitude
+                            if dist > 1 and dist < 5000 then
+                                args[i] = pos
+                            end
+                        elseif typeof(arg) == "CFrame" then
+                            local dist = (arg.Position - Camera.CFrame.Position).Magnitude
+                            if dist > 1 and dist < 5000 then
+                                local dir = (pos - Camera.CFrame.Position).Unit
+                                args[i] = CFrame.new(pos, pos + dir)
                             end
                         end
                     end
-                    local offset=target.Velocity*Vector3.new(pred["X"],pred["Y"],pred["Z"])
-                    local cf=target.CFrame*CFrame.new(offset.X,offset.Y,offset.Z)
-                    if key=="Hit" then return cf else return target end
+                    return oldNamecall(self, table.unpack(args))
                 end
             end
-            return oldIdx(obj,key)
+            return oldNamecall(self, ...)
+        end)
+        setreadonly(mt, true)
+    end)
+    if ok then print("[SA] __namecall hook active")
+    else warn("[SA] __namecall hook failed") end
+end
+
+-- ── HOOK 3: Workspace.Raycast — redirect rays fired near the camera
+if Capabilities[1] then
+    pcall(function()
+        local orig = hookfunction(workspace.Raycast, function(self, origin, dir, params)
+            if not checkcaller() then
+                local camDist = (origin - Camera.CFrame.Position).Magnitude
+                if camDist < 15 then
+                    local _, newDir = SARedirectRay(origin, dir)
+                    dir = newDir
+                end
+            end
+            return orig(self, origin, dir, params)
         end)
     end)
-    if ok then print("[Silent Aim] Metatable hook enabled")
-    else warn("[Silent Aim] Metatable hook failed"); ShowNotification("Silent Aim","basic mode",4) end
-else
-    warn("[Silent Aim] Not supported"); ShowNotification("Silent Aim","limited mode",4)
+    print("[SA] Raycast hook active")
+end
+
+-- ── HOOK 4: FindPartOnRay + FindPartOnRayWithIgnoreList (legacy API)
+if Capabilities[1] then
+    pcall(function()
+        local orig = hookfunction(workspace.FindPartOnRay, function(self, ray, ...)
+            if not checkcaller() then
+                local o, d = SARedirectRay(ray.Origin, ray.Direction)
+                ray = Ray.new(o, d)
+            end
+            return orig(self, ray, ...)
+        end)
+    end)
+    pcall(function()
+        local orig = hookfunction(workspace.FindPartOnRayWithIgnoreList, function(self, ray, list, ...)
+            if not checkcaller() then
+                local o, d = SARedirectRay(ray.Origin, ray.Direction)
+                ray = Ray.new(o, d)
+            end
+            return orig(self, ray, list, ...)
+        end)
+    end)
+    print("[SA] FindPartOnRay hooks active")
 end
 
 -- ============================================================================
+
 -- SPREAD CHANGER  (only runs if shared.MoozeV2["Weapon Modifications"]["Spread Changer"]["Enabled"] == true)
 -- ============================================================================
 local function ApplySpread()
