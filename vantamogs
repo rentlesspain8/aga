@@ -189,6 +189,76 @@ Players.PlayerRemoving:Connect(RemoveESP)
 RunService.Heartbeat:Connect(RefreshESP)
 
 -- ============================================================================
+-- HOTKEY LABELS  (bottom-of-screen HUD showing active feature states)
+-- Reads CFG()["General"]["Show Hotkeys"] — set false to hide entirely
+-- ============================================================================
+local HotkeyLabels = {}  -- pool of Drawing Text objects
+
+-- runtime state refs (set by each feature's keybind handler below)
+local HKState = {
+    SilentAim   = false,
+    CamLock     = false,  -- mirrors CamLocked
+    TriggerBot  = false,
+    Speed       = false,
+    DoubleTap   = false,
+}
+
+local LABEL_COLOR_ACTIVE   = Color3.fromRGB(143, 174, 211)
+local LABEL_COLOR_INACTIVE = Color3.fromRGB(120, 120, 120)
+local LABEL_SIZE           = 13
+local LABEL_BOTTOM_OFFSET  = 80   -- pixels up from the very bottom edge
+
+local function GetOrCreateLabel(index)
+    if not HotkeyLabels[index] then
+        local t = Drawing.new("Text")
+        t.Visible  = false
+        t.Center   = true
+        t.Outline  = true
+        t.Font     = Drawing.Fonts.UI
+        t.Size     = LABEL_SIZE
+        t.ZIndex   = 999
+        HotkeyLabels[index] = t
+    end
+    return HotkeyLabels[index]
+end
+
+local function UpdateHotkeyLabels()
+    if not CFG()["General"]["Show Hotkeys"] then
+        for _, lbl in pairs(HotkeyLabels) do lbl.Visible = false end
+        return
+    end
+
+    -- build list of entries: { text, active }
+    local entries = {
+        { text = "Silent Aim  [" .. CFG()["General"]["Binds"]["Silent Aim"]   .. "]", active = HKState.SilentAim  },
+        { text = "Cam Lock    [" .. CFG()["General"]["Binds"]["Camera Lock"]  .. "]", active = HKState.CamLock    },
+        { text = "Trigger Bot [" .. CFG()["General"]["Binds"]["Trigger Bot"]  .. "]", active = HKState.TriggerBot and CFG()["Trigger Bot"]["Enabled"] },
+        { text = "Speed       [" .. CFG()["General"]["Binds"]["Speed"]        .. "]", active = HKState.Speed      and CFG()["Player Modifications"]["Speed"]["Enabled"] },
+        { text = "Double Tap  [" .. CFG()["General"]["Binds"]["Double Tap"]   .. "]", active = HKState.DoubleTap  and CFG()["Weapon Modifications"]["Double Tap"]["Enabled"] },
+    }
+
+    local vp     = Camera.ViewportSize
+    local totalH = #entries * (LABEL_SIZE + 4)
+    local startY = vp.Y - LABEL_BOTTOM_OFFSET - totalH
+    local centerX = vp.X / 2
+
+    for i, entry in ipairs(entries) do
+        local lbl = GetOrCreateLabel(i)
+        lbl.Text     = entry.text
+        lbl.Color    = entry.active and LABEL_COLOR_ACTIVE or LABEL_COLOR_INACTIVE
+        lbl.Position = Vector2.new(centerX, startY + (i - 1) * (LABEL_SIZE + 4))
+        lbl.Visible  = true
+    end
+
+    -- hide any extras from a previous longer list
+    for i = #entries + 1, #HotkeyLabels do
+        HotkeyLabels[i].Visible = false
+    end
+end
+
+RunService.RenderStepped:Connect(UpdateHotkeyLabels)
+
+-- ============================================================================
 -- TRIGGER BOT  (only runs if shared.Vyron["Trigger Bot"]["Enabled"] == true)
 -- ============================================================================
 local TBActive = false  -- runtime toggle (keybind flips this)
@@ -240,6 +310,7 @@ UserInputService.InputBegan:Connect(function(input,gp)
     if input.KeyCode==Enum.KeyCode[bind] then
         if CFG()["Trigger Bot"]["Type"]=="Toggle" then
             TBActive=not TBActive
+            HKState.TriggerBot = TBActive
             ShowNotification("Trigger Bot", TBActive and "on" or "off", 2)
         end
     end
@@ -311,6 +382,7 @@ UserInputService.InputBegan:Connect(function(input,gp)
     -- (silent aim handler below will check the same and skip if cam lock consumed it)
     if CamLocked then
         CamLocked=false; CamTarget=nil
+        HKState.CamLock = false
     else
         local clCfg=CFG()["Camera Lock"]
         local fovCfg=clCfg["FOV"] or {}
@@ -333,6 +405,7 @@ UserInputService.InputBegan:Connect(function(input,gp)
         end
         if best then
             CamLocked=true; CamTarget=best
+            HKState.CamLock = true
         end
     end
 end)
@@ -359,7 +432,7 @@ RunService.RenderStepped:Connect(function()
     -- validate target still alive
     local char=CamTarget.Parent
     if not char or IsKnockedOut(char) then
-        CamLocked=false; CamTarget=nil; return
+        CamLocked=false; CamTarget=nil; HKState.CamLock=false; return
     end
 
     -- prediction: offset aim point by target velocity
@@ -490,6 +563,7 @@ UserInputService.InputBegan:Connect(function(input,gp)
     if input.KeyCode~=Enum.KeyCode[bind] then return end
     if SATarget then
         SATarget=nil; SAActive=false
+        HKState.SilentAim = false
     else
         local best,bd=nil,math.huge
         local mp=UserInputService:GetMouseLocation()
@@ -508,6 +582,7 @@ UserInputService.InputBegan:Connect(function(input,gp)
         end
         if best then
             SATarget=best; SAActive=true
+            HKState.SilentAim = true
         end
     end
 end)
@@ -598,6 +673,7 @@ do
             local bind=CFG()["General"]["Binds"]["Speed"] or "X"
             if input.KeyCode==Enum.KeyCode[bind:upper()] then
                 speedOn=not speedOn
+                HKState.Speed = speedOn
                 if not speedOn and hum then hum.WalkSpeed=16 end
             end
         end)
@@ -655,6 +731,7 @@ do
         local bind = CFG()["General"]["Binds"]["Double Tap"]:upper()
         if input.KeyCode == Enum.KeyCode[bind] then
             DTActive = not DTActive
+            HKState.DoubleTap = DTActive
             ShowNotification("Double Tap", DTActive and "on" or "off", 2)
         end
     end)
