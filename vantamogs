@@ -293,15 +293,27 @@ local function IsKnockedOut(char)
     return false
 end
 
+-- FOV circle drawing for camera lock
+local CLFovCircle = Drawing.new("Circle")
+CLFovCircle.Filled       = false
+CLFovCircle.Thickness    = 1
+CLFovCircle.Transparency = 1
+CLFovCircle.Color        = Color3.fromRGB(255, 255, 255)
+CLFovCircle.NumSides     = 64
+CLFovCircle.Visible      = false
+
 UserInputService.InputBegan:Connect(function(input,gp)
     if gp then return end
-    if not CFG()["Camera Lock"]["Enabled"] then return end  -- master switch
+    if not CFG()["Camera Lock"]["Enabled"] then return end
     local bind=CFG()["General"]["Binds"]["Camera Lock"]:upper()
     if input.KeyCode~=Enum.KeyCode[bind] then return end
     if CamLocked then
         CamLocked=false; CamTarget=nil
-        ShowNotification("Camera Lock","off",2)
     else
+        local clCfg=CFG()["Camera Lock"]
+        local fovCfg=clCfg["FOV"] or {}
+        local useFOV=fovCfg["Enabled"]
+        local fovRadius=fovCfg["Size"] or 120
         local best,bd=nil,math.huge
         local mp=UserInputService:GetMouseLocation()
         for _,p in ipairs(Players:GetPlayers()) do
@@ -311,6 +323,8 @@ UserInputService.InputBegan:Connect(function(input,gp)
                     local sp,on=Camera:WorldToViewportPoint(hrp.Position)
                     if on and sp.Z>0 then
                         local d=(Vector2.new(sp.X,sp.Y)-mp).Magnitude
+                        -- if FOV enabled, skip targets outside radius
+                        if useFOV and d>fovRadius then continue end
                         if d<bd then bd=d; best=hrp end
                     end
                 end
@@ -318,24 +332,55 @@ UserInputService.InputBegan:Connect(function(input,gp)
         end
         if best then
             CamLocked=true; CamTarget=best
-            local pl=Players:GetPlayerFromCharacter(best.Parent)
-            ShowNotification("Camera Lock", pl and pl.Name or "locked", 2)
-        else
-            ShowNotification("Camera Lock","no target near mouse",2)
         end
     end
 end)
 
 RunService.RenderStepped:Connect(function()
-    if not CFG()["Camera Lock"]["Enabled"] then return end  -- master switch
+    local clCfg=CFG()["Camera Lock"]
+    if not clCfg["Enabled"] then
+        CLFovCircle.Visible=false; return
+    end
+
+    -- FOV circle
+    local fovCfg=clCfg["FOV"] or {}
+    if fovCfg["Enabled"] and fovCfg["Visible"] then
+        local mp=UserInputService:GetMouseLocation()
+        CLFovCircle.Position=Vector2.new(mp.X, mp.Y)
+        CLFovCircle.Radius=fovCfg["Size"] or 120
+        CLFovCircle.Visible=true
+    else
+        CLFovCircle.Visible=false
+    end
+
     if not CamLocked or not CamTarget then return end
+
     -- validate target still alive
     local char=CamTarget.Parent
     if not char or IsKnockedOut(char) then
-        CamLocked=false; CamTarget=nil
-        ShowNotification("Camera Lock","target lost",2); return
+        CamLocked=false; CamTarget=nil; return
     end
-    Camera.CFrame=CFrame.new(Camera.CFrame.Position,CamTarget.Position)
+
+    -- prediction: offset aim point by target velocity
+    local pred=clCfg["Prediction"] or 0
+    local vel=Vector3.new(0,0,0)
+    pcall(function()
+        vel=CamTarget.AssemblyLinearVelocity or CamTarget.Velocity or Vector3.new(0,0,0)
+    end)
+    local aimPos=CamTarget.Position + vel*pred
+
+    -- build target CFrame
+    local targetCF=CFrame.new(Camera.CFrame.Position, aimPos)
+
+    -- smoothness: 0 = instant, >0 = lerp
+    local smooth=clCfg["Smoothness"] or 0
+    if smooth>0 then
+        -- clamp so it never fully stops (min alpha = 0.01)
+        local alpha=math.clamp(1 - smooth, 0.01, 1)
+        Camera.CFrame=Camera.CFrame:Lerp(targetCF, alpha)
+    else
+        Camera.CFrame=targetCF
+    end
 end)
 
 -- ============================================================================
