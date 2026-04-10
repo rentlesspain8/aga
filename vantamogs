@@ -1,4 +1,4 @@
--- mooze.txt | Mooze 2.0 Logic
+-- mooze.txt | Vyron Logic
 -- Run config.lua first. It sets shared.Vyron.
 -- RULE: every feature reads shared.Vyron directly at runtime.
 --       Nothing is cached into a local that could drift from config.
@@ -30,15 +30,15 @@ if Capabilities[4] then ExecutorName = identifyexecutor() end
 -- ============================================================================
 local function ShowNotification() end
 
-print("[Mooze] Running on:", ExecutorName)
-print("[Mooze] Hooking:",   Capabilities[1] and "v" or "x")
-print("[Mooze] Metatable:", Capabilities[5] and "v" or "x")
+print("[Vyron] Running on:", ExecutorName)
+print("[Vyron] Hooking:",   Capabilities[1] and "v" or "x")
+print("[Vyron] Metatable:", Capabilities[5] and "v" or "x")
 
 -- ============================================================================
 -- CONFIG GUARD
 -- ============================================================================
-assert(shared.Vyron,                "[Mooze] Config not found. Run config.lua first.")
-assert(shared.Vyron["Silent Aim"],  "[Mooze] Invalid config - missing Silent Aim section.")
+assert(shared.Vyron,                "[Vyron] Config not found. Run config.lua first.")
+assert(shared.Vyron["Silent Aim"],  "[Vyron] Invalid config - missing Silent Aim section.")
 
 -- shorthand that always reads live from config
 local function CFG() return shared.Vyron end
@@ -47,7 +47,7 @@ local function CFG() return shared.Vyron end
 -- AC BYPASS
 -- ============================================================================
 if Capabilities[1] and Capabilities[2] and Capabilities[3] then
-    print("[Mooze] Initializing AC bypass...")
+    print("[Vyron] Initializing AC bypass...")
     local MessageOut = game:GetService("LogService").MessageOut
     local function BypassConnection(conn)
         pcall(function()
@@ -74,7 +74,7 @@ if Capabilities[1] and Capabilities[2] and Capabilities[3] then
         end end
     end)
 else
-    warn("[Mooze] AC bypass disabled")
+    warn("[Vyron] AC bypass disabled")
 end
 
 -- ============================================================================
@@ -678,5 +678,5 @@ do
     end
 end
 
-print("[Mooze] Loaded. Executor: "..ExecutorName)
-print("[Mooze] Features: "..(Capabilities[5] and "Full" or "Limited"))
+print("[Vyron] Loaded. Executor: "..ExecutorName)
+print("[Vyron] Features: "..(Capabilities[5] and "Full" or "Limited"))
