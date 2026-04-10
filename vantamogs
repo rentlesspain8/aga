@@ -279,6 +279,11 @@ local function TBGetTarget()
                     if part.Name=="HumanoidRootPart" then
                         local pred=tbCfg["Prediction"]
                         pos=pos+Vector3.new(pred["X"],pred["Y"],pred["Z"])
+                        local vel=tbCfg["Velocity"]
+                        if vel and vel["Enabled"] then
+                            local v=part.Velocity
+                            if v.Magnitude>vel["Magnitude"] then pos=pos+v*0.1 end
+                        end
                     end
                     local sp,on=Camera:WorldToScreenPoint(pos)
                     if on and sp.Z>0 then
@@ -540,7 +545,19 @@ if Capabilities[5] then
                 local saCfg=CFG()["Silent Aim"]
                 local target=SACurrentTarget
                 if target and SAActive and saCfg["Enabled"] then
-                    if key=="Hit" then return target.CFrame else return target end
+                    local pred=saCfg["Prediction"]
+                    local redir=saCfg["Client Redirect"]
+                    local tool=LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Tool")
+                    if redir["Enabled"] and tool then
+                        for _,w in ipairs(redir["Weapons"]) do
+                            if string.find(string.lower(tostring(tool.Name)),string.lower(w)) then
+                                pred=redir["Prediction"]; break
+                            end
+                        end
+                    end
+                    local offset=target.Velocity*Vector3.new(pred["X"],pred["Y"],pred["Z"])
+                    local cf=target.CFrame*CFrame.new(offset.X,offset.Y,offset.Z)
+                    if key=="Hit" then return cf else return target end
                 end
             end
             return oldIdx(obj,key)
