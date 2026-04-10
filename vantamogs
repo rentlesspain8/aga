@@ -30,52 +30,57 @@ if Capabilities[4] then
 end
 
 local function ShowNotification(title, message, duration)
-    local notifGui = Instance.new("ScreenGui")
-    notifGui.Name = "MoozeNotif"
-    pcall(function() notifGui.Parent = Services.CoreGui end)
-    if not notifGui.Parent then notifGui.Parent = Services.Players.LocalPlayer:WaitForChild("PlayerGui") end
+    local ts  = Services.TweenService
+    local gui = Instance.new("ScreenGui")
+    gui.Name = "MoozeNotif"
+    gui.ResetOnSpawn = false
+    pcall(function() gui.Parent = Services.CoreGui end)
+    if not gui.Parent then gui.Parent = Services.Players.LocalPlayer:WaitForChild("PlayerGui") end
 
-    local frame = Instance.new("Frame")
-    frame.Size = UDim2.new(0, 300, 0, 80)
-    frame.Position = UDim2.new(1, 10, 0, 10)
-    frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-    frame.BorderSizePixel = 2
-    frame.BorderColor3 = Color3.fromRGB(255, 0, 0)
-    frame.Parent = notifGui
+    local card = Instance.new("Frame")
+    card.Size = UDim2.new(0, 260, 0, 56)
+    card.Position = UDim2.new(1, 10, 1, -70)
+    card.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
+    card.BorderSizePixel = 0
+    card.Parent = gui
+    Instance.new("UICorner", card).CornerRadius = UDim.new(0, 8)
 
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 8)
-    corner.Parent = frame
+    local bar = Instance.new("Frame")
+    bar.Size = UDim2.new(0, 3, 1, 0)
+    bar.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
+    bar.BorderSizePixel = 0
+    bar.Parent = card
+    Instance.new("UICorner", bar).CornerRadius = UDim.new(0, 8)
 
-    local titleLabel = Instance.new("TextLabel")
-    titleLabel.Size = UDim2.new(1, -10, 0, 25)
-    titleLabel.Position = UDim2.new(0, 5, 0, 5)
-    titleLabel.BackgroundTransparency = 1
-    titleLabel.Text = title
-    titleLabel.Font = Enum.Font.SourceSansBold
-    titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-    titleLabel.TextSize = 16
-    titleLabel.TextXAlignment = Enum.TextXAlignment.Left
-    titleLabel.Parent = frame
+    local lbl = Instance.new("TextLabel")
+    lbl.Size = UDim2.new(1, -18, 0, 20)
+    lbl.Position = UDim2.new(0, 14, 0, 8)
+    lbl.BackgroundTransparency = 1
+    lbl.Text = title
+    lbl.Font = Enum.Font.GothamBold
+    lbl.TextColor3 = Color3.fromRGB(255, 255, 255)
+    lbl.TextSize = 13
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.Parent = card
 
-    local msgLabel = Instance.new("TextLabel")
-    msgLabel.Size = UDim2.new(1, -10, 0, 45)
-    msgLabel.Position = UDim2.new(0, 5, 0, 30)
-    msgLabel.BackgroundTransparency = 1
-    msgLabel.Text = message
-    msgLabel.Font = Enum.Font.SourceSans
-    msgLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-    msgLabel.TextSize = 14
-    msgLabel.TextWrapped = true
-    msgLabel.TextXAlignment = Enum.TextXAlignment.Left
-    msgLabel.TextYAlignment = Enum.TextYAlignment.Top
-    msgLabel.Parent = frame
+    local sub = Instance.new("TextLabel")
+    sub.Size = UDim2.new(1, -18, 0, 16)
+    sub.Position = UDim2.new(0, 14, 0, 30)
+    sub.BackgroundTransparency = 1
+    sub.Text = message
+    sub.Font = Enum.Font.Gotham
+    sub.TextColor3 = Color3.fromRGB(140, 140, 140)
+    sub.TextSize = 11
+    sub.TextXAlignment = Enum.TextXAlignment.Left
+    sub.Parent = card
 
-    Services.TweenService:Create(frame, TweenInfo.new(0.3), {Position = UDim2.new(1, -310, 0, 10)}):Play()
-    task.delay(duration or 5, function()
-        Services.TweenService:Create(frame, TweenInfo.new(0.3), {Position = UDim2.new(1, 10, 0, 10)}):Play()
-        task.wait(0.3)
-        notifGui:Destroy()
+    local easeIn = TweenInfo.new(0.25, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
+    local easeOut = TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.In)
+    ts:Create(card, easeIn, {Position = UDim2.new(1, -270, 1, -70)}):Play()
+    task.delay(duration or 4, function()
+        ts:Create(card, easeOut, {Position = UDim2.new(1, 10, 1, -70)}):Play()
+        task.wait(0.25)
+        gui:Destroy()
     end)
 end
 
@@ -83,69 +88,60 @@ print("[Mooze] Running on:", ExecutorName)
 print("[Mooze] Hooking:", Capabilities[1] and "✓" or "✗")
 print("[Mooze] Metatable:", Capabilities[5] and "✓" or "✗")
 
--- Loading notification
+-- Loading notification (single, modern)
 do
-    local TweenService = Services.TweenService
-    local notifGui = Instance.new("ScreenGui")
-    notifGui.Name = "MoozeLoadNotif"
-    notifGui.ResetOnSpawn = false
-    pcall(function() notifGui.Parent = Services.CoreGui end)
-    if not notifGui.Parent then
-        notifGui.Parent = Services.Players.LocalPlayer:WaitForChild("PlayerGui")
-    end
+    local ts  = Services.TweenService
+    local gui = Instance.new("ScreenGui")
+    gui.Name = "MoozeLoad"
+    gui.ResetOnSpawn = false
+    pcall(function() gui.Parent = Services.CoreGui end)
+    if not gui.Parent then gui.Parent = Services.Players.LocalPlayer:WaitForChild("PlayerGui") end
 
-    local frame = Instance.new("Frame")
-    frame.Size = UDim2.new(0, 340, 0, 90)
-    frame.Position = UDim2.new(0.5, -170, 0, -100)
-    frame.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
-    frame.BorderSizePixel = 0
-    frame.Parent = notifGui
+    local card = Instance.new("Frame")
+    card.Size = UDim2.new(0, 280, 0, 64)
+    card.Position = UDim2.new(0.5, -140, 1, 80)
+    card.BackgroundColor3 = Color3.fromRGB(14, 14, 14)
+    card.BorderSizePixel = 0
+    card.Parent = gui
+    Instance.new("UICorner", card).CornerRadius = UDim.new(0, 10)
 
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 10)
-    corner.Parent = frame
-
-    local accent = Instance.new("Frame")
-    accent.Size = UDim2.new(0, 4, 1, 0)
-    accent.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
-    accent.BorderSizePixel = 0
-    accent.Parent = frame
-    Instance.new("UICorner", accent).CornerRadius = UDim.new(0, 10)
+    local bar = Instance.new("Frame")
+    bar.Size = UDim2.new(1, 0, 0, 2)
+    bar.Position = UDim2.new(0, 0, 1, -2)
+    bar.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
+    bar.BorderSizePixel = 0
+    bar.Parent = card
+    Instance.new("UICorner", bar).CornerRadius = UDim.new(0, 2)
 
     local title = Instance.new("TextLabel")
-    title.Size = UDim2.new(1, -20, 0, 28)
-    title.Position = UDim2.new(0, 14, 0, 8)
+    title.Size = UDim2.new(1, -20, 0, 22)
+    title.Position = UDim2.new(0, 14, 0, 10)
     title.BackgroundTransparency = 1
-    title.Text = "Loading Mooze 2.0"
-    title.Font = Enum.Font.SourceSansBold
+    title.Text = "mooze 2.0"
+    title.Font = Enum.Font.GothamBold
     title.TextColor3 = Color3.fromRGB(255, 255, 255)
-    title.TextSize = 17
+    title.TextSize = 15
     title.TextXAlignment = Enum.TextXAlignment.Left
-    title.Parent = frame
+    title.Parent = card
 
-    local msg = Instance.new("TextLabel")
-    msg.Size = UDim2.new(1, -20, 0, 50)
-    msg.Position = UDim2.new(0, 14, 0, 34)
-    msg.BackgroundTransparency = 1
-    msg.Text = "executor: potassium — have fun!"
-    msg.Font = Enum.Font.SourceSans
-    msg.TextColor3 = Color3.fromRGB(180, 180, 180)
-    msg.TextSize = 14
-    msg.TextWrapped = true
-    msg.TextXAlignment = Enum.TextXAlignment.Left
-    msg.TextYAlignment = Enum.TextYAlignment.Top
-    msg.Parent = frame
+    local sub = Instance.new("TextLabel")
+    sub.Size = UDim2.new(1, -20, 0, 16)
+    sub.Position = UDim2.new(0, 14, 0, 34)
+    sub.BackgroundTransparency = 1
+    sub.Text = "executor: potassium  •  have fun"
+    sub.Font = Enum.Font.Gotham
+    sub.TextColor3 = Color3.fromRGB(100, 100, 100)
+    sub.TextSize = 11
+    sub.TextXAlignment = Enum.TextXAlignment.Left
+    sub.Parent = card
 
-    TweenService:Create(frame, TweenInfo.new(0.35, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
-        Position = UDim2.new(0.5, -170, 0, 14)
-    }):Play()
-
+    local easeIn  = TweenInfo.new(0.4, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
+    local easeOut = TweenInfo.new(0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.In)
+    ts:Create(card, easeIn, {Position = UDim2.new(0.5, -140, 1, -80)}):Play()
     task.delay(4, function()
-        TweenService:Create(frame, TweenInfo.new(0.3), {
-            Position = UDim2.new(0.5, -170, 0, -100)
-        }):Play()
+        ts:Create(card, easeOut, {Position = UDim2.new(0.5, -140, 1, 80)}):Play()
         task.wait(0.35)
-        notifGui:Destroy()
+        gui:Destroy()
     end)
 end
 
@@ -466,14 +462,13 @@ do
     local FOVCircle = Drawing.new("Circle")
     FOVCircle.Visible      = SilentAimbotConfig["FOV"]["Enabled"]
     FOVCircle.Transparency = 1
-    FOVCircle.Thickness    = 2
+    FOVCircle.Thickness    = 1.5
     FOVCircle.Color        = Color3.new(1, 1, 1)
-    FOVCircle.NumSides     = 100
+    FOVCircle.NumSides     = 128
     FOVCircle.Filled       = false
+    FOVCircle.Radius       = SilentAimbotConfig["FOV"]["Size"].X * 5
 
-    local LastFOVUpdate = 0
-    local FOVUpdateInterval = 0.033
-    local CachedRadius = 0
+    local CachedRadius = FOVCircle.Radius
 
     local function IsShiftLockActive()
         local playerGui = LocalPlayer:FindFirstChildOfClass("PlayerGui")
@@ -497,15 +492,14 @@ do
         return false
     end
 
-    -- RenderStepped: only update position every frame for smooth tracking
+    -- position update: every render frame, zero throttle = no choppiness
     RunService.RenderStepped:Connect(function()
-        if not SilentAimbotConfig["FOV"]["Enabled"] then
-            FOVCircle.Visible = false
-            return
-        end
-        FOVCircle.Visible = true
+        local fovEnabled = SilentAimbotConfig["FOV"]["Enabled"]
+        FOVCircle.Visible = fovEnabled
+        if not fovEnabled then return end
+
         if IsShiftLockActive() then
-            FOVCircle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+            FOVCircle.Position = Vector2.new(Camera.ViewportSize.X * 0.5, Camera.ViewportSize.Y * 0.5)
             LastMousePosition  = FOVCircle.Position
         else
             local mp = UserInputService:GetMouseLocation()
@@ -514,11 +508,16 @@ do
         end
     end)
 
-    -- Heartbeat: throttled — update radius and find targets (heavier work)
-    local function UpdateFOVLogic()
-        local fovConfig  = SilentAimbotConfig["FOV"]
+    -- radius + target logic: throttled, no need to run every frame
+    local LastLogicStep = 0
+    RunService.Heartbeat:Connect(function(dt)
+        LastLogicStep = LastLogicStep + dt
+        if LastLogicStep < 0.05 then return end
+        LastLogicStep = 0
+
+        local fovConfig   = SilentAimbotConfig["FOV"]
         local currentTool = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Tool")
-        local radius = fovConfig["Size"].X * 5
+        local radius      = fovConfig["Size"].X * 5
 
         if fovConfig["Weapons Configuration"] and fovConfig["Weapons Configuration"]["Enabled"] and currentTool then
             local wn = string.lower(currentTool.Name or "")
@@ -529,14 +528,12 @@ do
             end
         end
 
-        -- only write NumSides when radius actually changes
         if radius ~= CachedRadius then
-            CachedRadius       = radius
-            FOVCircle.Radius   = radius
-            FOVCircle.NumSides = math.clamp(math.floor(radius * 2), 64, 128)
+            CachedRadius     = radius
+            FOVCircle.Radius = radius
         end
 
-        local bestPart, bestDistance = nil, math.huge
+        local bestPart, bestDist = nil, math.huge
         for _, player in pairs(Players:GetPlayers()) do
             if player ~= LocalPlayer and player.Character then
                 local targetPart = SilentAimbotConfig["Hit Part"] == "Closest Point"
@@ -546,22 +543,14 @@ do
                     local sp, on = Camera:WorldToViewportPoint(targetPart.Position)
                     if on and sp.Z > 0 then
                         local d = (LastMousePosition - Vector2.new(sp.X, sp.Y)).Magnitude
-                        if d < bestDistance and d <= radius then
-                            bestPart, bestDistance = targetPart, d
+                        if d < bestDist and d <= radius then
+                            bestPart, bestDist = targetPart, d
                         end
                     end
                 end
             end
         end
         CurrentTarget = bestPart
-    end
-
-    RunService.Heartbeat:Connect(function(deltaTime)
-        LastFOVUpdate = LastFOVUpdate + deltaTime
-        if LastFOVUpdate >= FOVUpdateInterval then
-            LastFOVUpdate = 0
-            UpdateFOVLogic()
-        end
     end)
 
     local function ApplyPrediction(cframe, offset)
@@ -738,4 +727,3 @@ end
 print("[Mooze] Script loaded successfully!")
 print("[Mooze] Executor:", ExecutorName)
 print("[Mooze] Features:", Capabilities[5] and "Full" or "Limited")
-ShowNotification("Mooze Ready", "All features loaded!", 4)
