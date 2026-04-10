@@ -1,222 +1,161 @@
 -- mooze.txt | Mooze 2.0 Logic
--- Run config.lua first — it sets shared.MoozeV2 and loadstrings this file.
+-- Run config.lua first. It sets shared.MoozeV2.
+-- RULE: every feature reads shared.MoozeV2 directly at runtime.
+--       Nothing is cached into a local that could drift from config.
 
 local Services = {
-    Players = game:GetService("Players"),
-    RunService = game:GetService("RunService"),
+    Players        = game:GetService("Players"),
+    RunService     = game:GetService("RunService"),
     UserInputService = game:GetService("UserInputService"),
-    TweenService = game:GetService("TweenService"),
-    Workspace = workspace,
-    CoreGui = game.CoreGui,
-    LogService = game:GetService("LogService")
+    TweenService   = game:GetService("TweenService"),
+    Workspace      = workspace,
+    CoreGui        = game.CoreGui,
 }
 
-local function SafeCall(func, ...)
-    local success, result = pcall(func, ...)
-    return success and result or nil
-end
+local function SafeCall(f,...) local ok,r=pcall(f,...); return ok and r or nil end
 
 local Capabilities = {
-    SafeCall(function() return hookfunction ~= nil end) or false,
+    SafeCall(function() return hookfunction  ~= nil end) or false,
     SafeCall(function() return getconnections ~= nil end) or false,
-    SafeCall(function() return getupvalues ~= nil end) or false,
+    SafeCall(function() return getupvalues   ~= nil end) or false,
     SafeCall(function() return identifyexecutor ~= nil end) or false,
-    SafeCall(function() return getrawmetatable ~= nil end) or false
+    SafeCall(function() return getrawmetatable ~= nil end) or false,
 }
 
 local ExecutorName = "Unknown"
-if Capabilities[4] then
-    ExecutorName = identifyexecutor()
-end
+if Capabilities[4] then ExecutorName = identifyexecutor() end
 
+-- ============================================================================
+-- NOTIFICATION
+-- ============================================================================
 local function ShowNotification(title, message, duration)
     local ts  = Services.TweenService
     local gui = Instance.new("ScreenGui")
-    gui.Name = "MoozeNotif"
-    gui.ResetOnSpawn = false
+    gui.Name = "MoozeNotif"; gui.ResetOnSpawn = false
     pcall(function() gui.Parent = Services.CoreGui end)
     if not gui.Parent then gui.Parent = Services.Players.LocalPlayer:WaitForChild("PlayerGui") end
-
     local card = Instance.new("Frame")
-    card.Size = UDim2.new(0, 260, 0, 56)
-    card.Position = UDim2.new(1, 10, 1, -70)
-    card.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
-    card.BorderSizePixel = 0
-    card.Parent = gui
-    Instance.new("UICorner", card).CornerRadius = UDim.new(0, 8)
-
+    card.Size = UDim2.new(0,260,0,56); card.Position = UDim2.new(1,10,1,-70)
+    card.BackgroundColor3 = Color3.fromRGB(18,18,18); card.BorderSizePixel = 0; card.Parent = gui
+    Instance.new("UICorner",card).CornerRadius = UDim.new(0,8)
     local bar = Instance.new("Frame")
-    bar.Size = UDim2.new(0, 3, 1, 0)
-    bar.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
-    bar.BorderSizePixel = 0
-    bar.Parent = card
-    Instance.new("UICorner", bar).CornerRadius = UDim.new(0, 8)
-
+    bar.Size = UDim2.new(0,3,1,0); bar.BackgroundColor3 = Color3.fromRGB(255,50,50)
+    bar.BorderSizePixel = 0; bar.Parent = card
+    Instance.new("UICorner",bar).CornerRadius = UDim.new(0,8)
     local lbl = Instance.new("TextLabel")
-    lbl.Size = UDim2.new(1, -18, 0, 20)
-    lbl.Position = UDim2.new(0, 14, 0, 8)
-    lbl.BackgroundTransparency = 1
-    lbl.Text = title
-    lbl.Font = Enum.Font.GothamBold
-    lbl.TextColor3 = Color3.fromRGB(255, 255, 255)
-    lbl.TextSize = 13
-    lbl.TextXAlignment = Enum.TextXAlignment.Left
-    lbl.Parent = card
-
+    lbl.Size = UDim2.new(1,-18,0,20); lbl.Position = UDim2.new(0,14,0,8)
+    lbl.BackgroundTransparency=1; lbl.Text=title; lbl.Font=Enum.Font.GothamBold
+    lbl.TextColor3=Color3.fromRGB(255,255,255); lbl.TextSize=13
+    lbl.TextXAlignment=Enum.TextXAlignment.Left; lbl.Parent=card
     local sub = Instance.new("TextLabel")
-    sub.Size = UDim2.new(1, -18, 0, 16)
-    sub.Position = UDim2.new(0, 14, 0, 30)
-    sub.BackgroundTransparency = 1
-    sub.Text = message
-    sub.Font = Enum.Font.Gotham
-    sub.TextColor3 = Color3.fromRGB(140, 140, 140)
-    sub.TextSize = 11
-    sub.TextXAlignment = Enum.TextXAlignment.Left
-    sub.Parent = card
-
-    local easeIn = TweenInfo.new(0.25, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
-    local easeOut = TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.In)
-    ts:Create(card, easeIn, {Position = UDim2.new(1, -270, 1, -70)}):Play()
-    task.delay(duration or 4, function()
-        ts:Create(card, easeOut, {Position = UDim2.new(1, 10, 1, -70)}):Play()
-        task.wait(0.25)
-        gui:Destroy()
+    sub.Size = UDim2.new(1,-18,0,16); sub.Position = UDim2.new(0,14,0,30)
+    sub.BackgroundTransparency=1; sub.Text=message; sub.Font=Enum.Font.Gotham
+    sub.TextColor3=Color3.fromRGB(140,140,140); sub.TextSize=11
+    sub.TextXAlignment=Enum.TextXAlignment.Left; sub.Parent=card
+    local eIn  = TweenInfo.new(0.25,Enum.EasingStyle.Quart,Enum.EasingDirection.Out)
+    local eOut = TweenInfo.new(0.2, Enum.EasingStyle.Quart,Enum.EasingDirection.In)
+    ts:Create(card,eIn, {Position=UDim2.new(1,-270,1,-70)}):Play()
+    task.delay(duration or 4,function()
+        ts:Create(card,eOut,{Position=UDim2.new(1,10,1,-70)}):Play()
+        task.wait(0.25); gui:Destroy()
     end)
 end
 
 print("[Mooze] Running on:", ExecutorName)
-print("[Mooze] Hooking:", Capabilities[1] and "✓" or "✗")
-print("[Mooze] Metatable:", Capabilities[5] and "✓" or "✗")
+print("[Mooze] Hooking:",   Capabilities[1] and "v" or "x")
+print("[Mooze] Metatable:", Capabilities[5] and "v" or "x")
 
--- Loading notification (single, modern)
+-- Loading card
 do
     local ts  = Services.TweenService
     local gui = Instance.new("ScreenGui")
-    gui.Name = "MoozeLoad"
-    gui.ResetOnSpawn = false
-    pcall(function() gui.Parent = Services.CoreGui end)
-    if not gui.Parent then gui.Parent = Services.Players.LocalPlayer:WaitForChild("PlayerGui") end
-
-    local card = Instance.new("Frame")
-    card.Size = UDim2.new(0, 280, 0, 64)
-    card.Position = UDim2.new(0.5, -140, 1, 80)
-    card.BackgroundColor3 = Color3.fromRGB(14, 14, 14)
-    card.BorderSizePixel = 0
-    card.Parent = gui
-    Instance.new("UICorner", card).CornerRadius = UDim.new(0, 10)
-
-    local bar = Instance.new("Frame")
-    bar.Size = UDim2.new(1, 0, 0, 2)
-    bar.Position = UDim2.new(0, 0, 1, -2)
-    bar.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
-    bar.BorderSizePixel = 0
-    bar.Parent = card
-    Instance.new("UICorner", bar).CornerRadius = UDim.new(0, 2)
-
-    local title = Instance.new("TextLabel")
-    title.Size = UDim2.new(1, -20, 0, 22)
-    title.Position = UDim2.new(0, 14, 0, 10)
-    title.BackgroundTransparency = 1
-    title.Text = "mooze 2.0"
-    title.Font = Enum.Font.GothamBold
-    title.TextColor3 = Color3.fromRGB(255, 255, 255)
-    title.TextSize = 15
-    title.TextXAlignment = Enum.TextXAlignment.Left
-    title.Parent = card
-
-    local sub = Instance.new("TextLabel")
-    sub.Size = UDim2.new(1, -20, 0, 16)
-    sub.Position = UDim2.new(0, 14, 0, 34)
-    sub.BackgroundTransparency = 1
-    sub.Text = "executor: potassium  •  have fun"
-    sub.Font = Enum.Font.Gotham
-    sub.TextColor3 = Color3.fromRGB(100, 100, 100)
-    sub.TextSize = 11
-    sub.TextXAlignment = Enum.TextXAlignment.Left
-    sub.Parent = card
-
-    local easeIn  = TweenInfo.new(0.4, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
-    local easeOut = TweenInfo.new(0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.In)
-    ts:Create(card, easeIn, {Position = UDim2.new(0.5, -140, 1, -80)}):Play()
-    task.delay(4, function()
-        ts:Create(card, easeOut, {Position = UDim2.new(0.5, -140, 1, 80)}):Play()
-        task.wait(0.35)
-        gui:Destroy()
+    gui.Name="MoozeLoad"; gui.ResetOnSpawn=false
+    pcall(function() gui.Parent=Services.CoreGui end)
+    if not gui.Parent then gui.Parent=Services.Players.LocalPlayer:WaitForChild("PlayerGui") end
+    local card=Instance.new("Frame")
+    card.Size=UDim2.new(0,280,0,64); card.Position=UDim2.new(0.5,-140,1,80)
+    card.BackgroundColor3=Color3.fromRGB(14,14,14); card.BorderSizePixel=0; card.Parent=gui
+    Instance.new("UICorner",card).CornerRadius=UDim.new(0,10)
+    local bar=Instance.new("Frame")
+    bar.Size=UDim2.new(1,0,0,2); bar.Position=UDim2.new(0,0,1,-2)
+    bar.BackgroundColor3=Color3.fromRGB(255,50,50); bar.BorderSizePixel=0; bar.Parent=card
+    Instance.new("UICorner",bar).CornerRadius=UDim.new(0,2)
+    local t=Instance.new("TextLabel")
+    t.Size=UDim2.new(1,-20,0,22); t.Position=UDim2.new(0,14,0,10)
+    t.BackgroundTransparency=1; t.Text="mooze 2.0"; t.Font=Enum.Font.GothamBold
+    t.TextColor3=Color3.fromRGB(255,255,255); t.TextSize=15
+    t.TextXAlignment=Enum.TextXAlignment.Left; t.Parent=card
+    local s=Instance.new("TextLabel")
+    s.Size=UDim2.new(1,-20,0,16); s.Position=UDim2.new(0,14,0,34)
+    s.BackgroundTransparency=1; s.Text="executor: potassium  -  have fun"
+    s.Font=Enum.Font.Gotham; s.TextColor3=Color3.fromRGB(100,100,100)
+    s.TextSize=11; s.TextXAlignment=Enum.TextXAlignment.Left; s.Parent=card
+    local eIn =TweenInfo.new(0.4,Enum.EasingStyle.Quart,Enum.EasingDirection.Out)
+    local eOut=TweenInfo.new(0.3,Enum.EasingStyle.Quart,Enum.EasingDirection.In)
+    ts:Create(card,eIn, {Position=UDim2.new(0.5,-140,1,-80)}):Play()
+    task.delay(4,function()
+        ts:Create(card,eOut,{Position=UDim2.new(0.5,-140,1,80)}):Play()
+        task.wait(0.35); gui:Destroy()
     end)
 end
 
 -- ============================================================================
 -- CONFIG GUARD
 -- ============================================================================
-assert(shared.MoozeV2, "[Mooze] Config not found. Run config.lua first.")
-assert(shared.MoozeV2["Silent Aim"], "[Mooze] Invalid config structure.")
+assert(shared.MoozeV2,                "[Mooze] Config not found. Run config.lua first.")
+assert(shared.MoozeV2["Silent Aim"],  "[Mooze] Invalid config - missing Silent Aim section.")
+
+-- shorthand that always reads live from config
+local function CFG() return shared.MoozeV2 end
 
 -- ============================================================================
 -- AC BYPASS
 -- ============================================================================
 if Capabilities[1] and Capabilities[2] and Capabilities[3] then
     print("[Mooze] Initializing AC bypass...")
-    local LogService = Services.LogService
-    local MessageOut = LogService.MessageOut
-
-    local function BypassConnection(connection)
+    local MessageOut = game:GetService("LogService").MessageOut
+    local function BypassConnection(conn)
         pcall(function()
-            local upvalueTable = getupvalues(connection.Function)[9]
-            if upvalueTable then
-                local targetFunction = upvalueTable[1]
-                setupvalue(targetFunction, 14, function(...)
-                    return function(...)
-                        local args = {...}
-                        if type(args[1]) == "table" and args[1][1] then
-                            pcall(function()
-                                if type(args[1][1]) == "userdata" then
-                                    args[1][1]:Disconnect(); args[1][2]:Disconnect()
-                                    args[1][3]:Disconnect(); args[1][4]:Disconnect()
-                                end
-                            end)
-                        end
-                    end
-                end)
-                setupvalue(targetFunction, 1, function(...) task.wait(200) end)
-                hookfunction(targetFunction, function(...) return {} end)
+            local ut = getupvalues(conn.Function)[9]
+            if ut then
+                local tf = ut[1]
+                setupvalue(tf,14,function(...) return function(...) local a={...}
+                    if type(a[1])=="table" and a[1][1] then pcall(function()
+                        if type(a[1][1])=="userdata" then
+                            a[1][1]:Disconnect();a[1][2]:Disconnect()
+                            a[1][3]:Disconnect();a[1][4]:Disconnect()
+                        end end) end end end)
+                setupvalue(tf,1,function(...) task.wait(200) end)
+                hookfunction(tf,function(...) return {} end)
             end
         end)
     end
-
-    local LastUpdate, UpdateInterval = 0, 10
-    local ConnectedConnections = {}
+    local lastT,interval,seen=0,10,{}
     Services.RunService.Heartbeat:Connect(function()
-        if tick() - LastUpdate >= UpdateInterval then
-            LastUpdate = tick()
-            local ok, connections = pcall(function() return getconnections(MessageOut) end)
-            if ok and connections then
-                for _, connection in ipairs(connections) do
-                    if not table.find(ConnectedConnections, connection) then
-                        table.insert(ConnectedConnections, connection)
-                        task.spawn(BypassConnection, connection)
-                    end
-                end
-            end
-        end
+        if tick()-lastT<interval then return end; lastT=tick()
+        local ok,conns=pcall(function() return getconnections(MessageOut) end)
+        if ok and conns then for _,c in ipairs(conns) do
+            if not table.find(seen,c) then table.insert(seen,c); task.spawn(BypassConnection,c) end
+        end end
     end)
 else
-    warn("[Mooze] AC bypass disabled - executor doesn't support required functions")
+    warn("[Mooze] AC bypass disabled")
 end
 
 -- ============================================================================
 -- SERVICES / LOCALS
 -- ============================================================================
-local MobileMode = false
-local Players     = Services.Players
-local LocalPlayer = Players.LocalPlayer
-local Camera      = Services.Workspace.CurrentCamera
-local RunService  = Services.RunService
+local Players          = Services.Players
+local LocalPlayer      = Players.LocalPlayer
+local Camera           = Services.Workspace.CurrentCamera
+local RunService       = Services.RunService
 local UserInputService = Services.UserInputService
 
-local Locked     = false
-local LockTarget = nil
-local CurrentFOV = shared.MoozeV2["Silent Aim"]["FOV"]["Size"] or 40
-local LockedTarget = nil  -- silent aim target (shared with ESP)
+-- Shared runtime state (NOT config - these are runtime toggles)
+local CamLocked    = false   -- camera lock runtime state
+local CamTarget    = nil     -- camera lock target part
+local SATarget     = nil     -- silent aim locked player (shared with ESP)
+local SAActive     = false   -- silent aim runtime on/off
 
 local BodyParts = {
     "Head","UpperTorso","HumanoidRootPart","LowerTorso",
@@ -224,681 +163,502 @@ local BodyParts = {
     "LeftUpperArm","RightUpperArm","LeftFoot","LeftLowerLeg",
     "LeftUpperLeg","RightLowerLeg","RightFoot","RightUpperLeg"
 }
-
 local BodyPartCache = {}
-local CacheTimeout = 2
-
-local function GetBodyParts(character)
+local function GetBodyParts(char)
     local now = tick()
-    if not BodyPartCache[character] or (now - (BodyPartCache[character].time or 0)) > CacheTimeout then
-        local parts = {}
-        for _, partName in ipairs(BodyParts) do
-            local part = character:FindFirstChild(partName)
-            if part then table.insert(parts, part) end
-        end
-        BodyPartCache[character] = {parts = parts, time = now}
+    if not BodyPartCache[char] or (now-(BodyPartCache[char].t or 0))>2 then
+        local p={}
+        for _,n in ipairs(BodyParts) do local pt=char:FindFirstChild(n); if pt then p[#p+1]=pt end end
+        BodyPartCache[char]={parts=p,t=now}
     end
-    return BodyPartCache[character].parts
+    return BodyPartCache[char].parts
 end
-
--- ============================================================================
--- TRIGGER BOT
--- ============================================================================
-local Config         = shared.MoozeV2
-local TriggerConfig  = Config["Trigger Bot"]
-
-local TriggerCircle = Drawing.new("Circle")
-TriggerCircle.Visible      = false
-TriggerCircle.Transparency = 1
-TriggerCircle.Color        = Color3.new(1,1,1)
-TriggerCircle.Filled       = true
-TriggerCircle.Radius       = TriggerConfig["FOV"] * 5
-TriggerCircle.NumSides     = 64
-TriggerCircle.Position     = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
-
-local LastTriggerStep   = 0
-local TriggerStepInterval = 0.05
-local LastActivationTime  = 0
-
-local function GetTargetInFOV()
-    local closestDistance = math.huge
-    local bestPlayer = nil
-    local circlePosition = TriggerCircle.Position
-    local radius = TriggerCircle.Radius
-    local prediction = TriggerConfig.Prediction
-    local velocityEnabled = VelocityConfig.Enabled
-    local velocityMagnitude = VelocityConfig.Magnitude
-
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and player.Character then
-            local bodyParts = GetBodyParts(player.Character)
-            for _, part in ipairs(bodyParts) do
-                if part.Transparency < 1 then
-                    local position = part.Position
-                    if part.Name == "HumanoidRootPart" then
-                        local pred = TriggerConfig["Prediction"]
-                        position = position + Vector3.new(pred["X"], pred["Y"], pred["Z"])
-                        local velCfg = TriggerConfig["Velocity"]
-                        if velCfg and velCfg["Enabled"] then
-                            local velocity = part.Velocity
-                            if velocity.Magnitude > velCfg["Magnitude"] then
-                                position = position + velocity * 0.1
-                            end
-                        end
-                    end
-                    local screenPosition, onScreen = Camera:WorldToScreenPoint(position)
-                    if onScreen and screenPosition.Z > 0 then
-                        local distance = (Vector2.new(screenPosition.X, screenPosition.Y) - circlePosition).Magnitude
-                        if distance <= radius and distance < closestDistance then
-                            closestDistance = distance
-                            bestPlayer = player
-                        end
-                    end
-                end
-            end
-        end
-    end
-    return bestPlayer
-end
-
-local TriggerKey = Enum.KeyCode[TriggerConfig["Bind"]:upper()]
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if not gameProcessed and input.KeyCode == TriggerKey then
-        if not TriggerConfig["Enabled"] then return end  -- disabled in config
-        if TriggerConfig["Type"] == "Toggle" then
-            TriggerConfig["_active"] = not (TriggerConfig["_active"] or false)
-        end
-        ShowNotification("Trigger Bot", TriggerConfig["_active"] and "Enabled" or "Disabled", 2)
-    end
-end)
-
-RunService.Heartbeat:Connect(function(deltaTime)
-    LastTriggerStep = LastTriggerStep + deltaTime
-    if LastTriggerStep < TriggerStepInterval then return end
-    LastTriggerStep = 0
-
-    if TriggerConfig["Enabled"] and TriggerConfig["_active"] then
-        local target = GetTargetInFOV()
-        TriggerCircle.Radius = TriggerConfig["FOV"] * 5
-        TriggerCircle.Position = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
-
-        if target and LocalPlayer.Character then
-            local tool = LocalPlayer.Character:FindFirstChildOfClass("Tool")
-            if tool and tool:FindFirstChild("Handle") then
-                local cleanName = function(text) return text:lower():gsub("[%[%]%- ]","") end
-                local toolName = cleanName(tool.Name)
-                local allowed = false
-                for _, weapon in ipairs(TriggerConfig["Weapons"]) do
-                    if toolName:find(cleanName(weapon), 1, true) then allowed = true; break end
-                end
-                if allowed and tick() - LastActivationTime >= TriggerConfig["Cooldown"] then
-                    tool:Activate(); tool:Deactivate()
-                    LastActivationTime = tick()
-                end
-            end
-        end
-    end
-end)
-
--- ============================================================================
--- CAMERA AIMBOT
--- ============================================================================
-do
-    local CamCfg       = shared.MoozeV2["Camera Lock"]
-    local CurrentCamera = Services.Workspace.CurrentCamera
-    local AimKey        = Enum.KeyCode[shared.MoozeV2["General"]["Binds"]["Camera Lock"]:upper()]
-
-    local function IsKnockedOut(character)
-        if not character then return false end
-        local bodyEffects = character:FindFirstChild("BodyEffects")
-        if bodyEffects then
-            local ko = bodyEffects:FindFirstChild("K.O")
-            if ko and ko.Value then return true end
-        end
-        local humanoid = character:FindFirstChildOfClass("Humanoid")
-        if humanoid then
-            local state = humanoid:GetState()
-            if state == Enum.HumanoidStateType.Dead or
-               state == Enum.HumanoidStateType.Physics or
-               state == Enum.HumanoidStateType.Ragdoll then return true end
-        end
-        local rootPart = character:FindFirstChild("HumanoidRootPart")
-        if rootPart and rootPart:FindFirstChild("GRABBING_CONSTRAINT") then return true end
-        return false
-    end
-
-    local function GetLockTarget()
-        if Locked and LockTarget then
-            if LockTarget.Parent and LockTarget.Parent:FindFirstChild("Humanoid") then
-                local humanoid = LockTarget.Parent:FindFirstChild("Humanoid")
-                local character = LockTarget.Parent
-                if humanoid and humanoid.Health > 0 and not IsKnockedOut(character) then
-                    return LockTarget
-                end
-            end
-            Locked = false; LockTarget = nil
-            ShowNotification("Target Lost", "unlocked", 2)
-            CamCfg["Enabled"] = false
-            return nil
-        end
-        return nil
-    end
-
-    local function FindMouseTarget()
-        local bestTarget, shortestDistance = nil, math.huge
-        local mousePosition = UserInputService:GetMouseLocation()
-        for _, player in ipairs(Players:GetPlayers()) do
-            if player ~= LocalPlayer and player.Character and not IsKnockedOut(player.Character) then
-                local rootPart = player.Character:FindFirstChild("HumanoidRootPart")
-                if rootPart then
-                    local sp, on = CurrentCamera:WorldToViewportPoint(rootPart.Position)
-                    if on and sp.Z > 0 then
-                        local distance = (Vector2.new(sp.X, sp.Y) - mousePosition).Magnitude
-                        if distance < shortestDistance then shortestDistance = distance; bestTarget = rootPart end
-                    end
-                end
-            end
-        end
-        return bestTarget
-    end
-
-    UserInputService.InputBegan:Connect(function(input, processed)
-        if processed then return end
-        if input.KeyCode == AimKey then
-            if not Locked then
-                local bestTarget = FindMouseTarget()
-                if bestTarget then
-                    Locked = true; LockTarget = bestTarget
-                    local player = Players:GetPlayerFromCharacter(bestTarget.Parent)
-                    if player then ShowNotification("Locked", player.Name, 2) end
-                    CamCfg["Enabled"] = true
-                else
-                    ShowNotification("No Target", "no player near mouse", 2)
-                end
-            else
-                Locked = false; LockTarget = nil
-                CamCfg["Enabled"] = false
-                ShowNotification("Unlocked", "lock off", 2)
-            end
-        end
-    end)
-
-    RunService.RenderStepped:Connect(function()
-        if CamCfg["Enabled"] then
-            local targetPart = GetLockTarget()
-            if targetPart then
-                CurrentCamera.CFrame = CFrame.new(CurrentCamera.CFrame.Position, targetPart.Position)
-            end
-        end
-    end)
-end
-
--- ============================================================================
--- SILENT AIMBOT
--- ============================================================================
-do
-    local SACfg             = shared.MoozeV2["Silent Aim"]
-    local LocalPlayer       = Players.LocalPlayer
-    local Camera            = Services.Workspace.CurrentCamera
-    local Mouse             = LocalPlayer:GetMouse()
-    local LastMousePosition = Vector2.new(0, 0)
-    local CurrentTarget     = nil
-    local SilentAimActive   = SACfg["Enabled"] == true
-
-    -- keybind: press to lock onto nearest player in FOV, press again to unlock
-    local SAKey = Enum.KeyCode[shared.MoozeV2["General"]["Binds"]["Silent Aim"]:upper()]
-    UserInputService.InputBegan:Connect(function(input, gameProcessed)
-        if gameProcessed then return end
-        if not SACfg["Enabled"] then return end  -- disabled in config
-        if input.KeyCode == SAKey then
-            if LockedTarget then
-                -- already targeting — untarget
-                LockedTarget    = nil
-                SilentAimActive = false
-                ShowNotification("Silent Aim", "untargeted", 2)
-            else
-                -- find closest player in FOV and lock onto them
-                local best, bestDist = nil, math.huge
-                local mp = UserInputService:GetMouseLocation()
-                local radius = SACfg["FOV"]["Size"] * 5
-                for _, player in ipairs(Players:GetPlayers()) do
-                    if player ~= LocalPlayer and player.Character then
-                        local root = player.Character:FindFirstChild("HumanoidRootPart")
-                        if root then
-                            local sp, on = Camera:WorldToViewportPoint(root.Position)
-                            if on and sp.Z > 0 then
-                                local d = (Vector2.new(sp.X, sp.Y) - mp).Magnitude
-                                if d <= radius and d < bestDist then
-                                    bestDist = d
-                                    best = player
-                                end
-                            end
-                        end
-                    end
-                end
-                if best then
-                    LockedTarget    = best
-                    SilentAimActive = true
-                    ShowNotification("Silent Aim", "targeting " .. best.Name, 2)
-                else
-                    ShowNotification("Silent Aim", "no target in FOV", 2)
-                end
-            end
-        end
-    end)
-
-    local function GetClosestPoint(player)
-        local bestPart, bestDistance = nil, math.huge
-        local pointScale = SACfg["Closest Point"] and SACfg["Closest Point"]["Scale"] or 1.0
-        if player.Character then
-            local bodyParts = GetBodyParts(player.Character)
-            for _, part in ipairs(bodyParts) do
-                local screenPosition, onScreen = Camera:WorldToViewportPoint(part.Position)
-                if onScreen and screenPosition.Z > 0 then
-                    local pointPosition = Vector2.new(screenPosition.X, screenPosition.Y)
-                    local distance = (LastMousePosition - pointPosition).Magnitude * pointScale
-                    if distance < bestDistance then
-                        bestPart, bestDistance = part, distance
-                    end
-                end
-            end
-        end
-        return bestPart
-    end
-
-    local FOVCircle = Drawing.new("Circle")
-    FOVCircle.Visible      = SACfg["FOV"]["Enabled"] and SACfg["FOV"]["Visible"]
-    FOVCircle.Transparency = 1
-    FOVCircle.Thickness    = 1.5
-    FOVCircle.Color        = Color3.new(1, 1, 1)
-    FOVCircle.NumSides     = 128
-    FOVCircle.Filled       = false
-    FOVCircle.Radius       = SACfg["FOV"]["Size"] * 5
-
-    local CachedRadius = FOVCircle.Radius
-
-    local function IsShiftLockActive()
-        -- check for ADS/aim tool (original check)
-        if LocalPlayer.Character then
-            local tool = LocalPlayer.Character:FindFirstChildOfClass("Tool")
-            if tool and tool:FindFirstChild("Ammo") then
-                return true
-            end
-        end
-        local playerGui = LocalPlayer:FindFirstChildOfClass("PlayerGui")
-        if playerGui then
-            local aimGui = playerGui:FindFirstChild("Aim")
-            if aimGui and aimGui.Visible then return true end
-        end
-        local mouse = LocalPlayer:GetMouse()
-        if mouse.Icon == "rbxasset://SystemCursors/Cross" then return true end
-        local playerModule = LocalPlayer.PlayerScripts:FindFirstChild("PlayerModule")
-        if playerModule then
-            local cameraModule = playerModule:FindFirstChild("CameraModule")
-            if cameraModule then
-                local mouseLockController = cameraModule:FindFirstChild("MouseLockController")
-                if mouseLockController then
-                    local isMouseLocked = mouseLockController:FindFirstChild("isMouseLocked")
-                    if isMouseLocked and isMouseLocked.Value then return true end
-                end
-            end
-        end
-        return false
-    end
-
-    -- FOV circle position: every render frame, zero throttle = smooth
-    RunService.RenderStepped:Connect(function()
-        local fovCfg = SACfg["FOV"]
-        FOVCircle.Visible = SACfg["Enabled"] and fovCfg["Enabled"] and fovCfg["Visible"]
-        if not FOVCircle.Visible then return end
-
-        if IsShiftLockActive() then
-            local centerScreen = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
-            FOVCircle.Position = centerScreen
-            LastMousePosition  = centerScreen
-        else
-            local mp = UserInputService:GetMouseLocation()
-            FOVCircle.Position = mp
-            LastMousePosition  = mp
-        end
-    end)
-
-    -- radius + target finding: throttled
-    local LastFOVUpdate    = 0
-    local FOVUpdateInterval = 0.033
-    RunService.Heartbeat:Connect(function(deltaTime)
-        LastFOVUpdate = LastFOVUpdate + deltaTime
-        if LastFOVUpdate < FOVUpdateInterval then return end
-        LastFOVUpdate = 0
-
-        local fovConfig   = SACfg["FOV"]
-        local currentTool = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Tool")
-        local radius      = fovConfig["Size"] * 5
-
-        if fovConfig["Weapons"]["Enabled"] and currentTool then
-            local weaponName = string.lower(currentTool.Name or "")
-            if string.find(weaponName, "shotgun") then
-                radius = fovConfig["Weapons"]["Shotguns"] * 5
-            elseif string.find(weaponName, "pistol") then
-                radius = fovConfig["Weapons"]["Pistols"] * 5
-            end
-        end
-
-        if radius ~= CachedRadius then
-            CachedRadius     = radius
-            FOVCircle.Radius = radius
-        end
-
-        local bestPart, bestDistance = nil, math.huge
-        for _, player in pairs(Players:GetPlayers()) do
-            if player ~= LocalPlayer and player.Character then
-                -- if we have a locked target only aim at them
-                if LockedTarget and player ~= LockedTarget then continue end
-                local targetPart = nil
-                if SACfg["Hit Part"] == "Closest Point" then
-                    targetPart = GetClosestPoint(player)
-                else
-                    targetPart = player.Character:FindFirstChild(SACfg["Hit Part"] or "Head")
-                end
-                if targetPart then
-                    local screenPosition, onScreen = Camera:WorldToViewportPoint(targetPart.Position)
-                    if onScreen and screenPosition.Z > 0 then
-                        local pointPosition = Vector2.new(screenPosition.X, screenPosition.Y)
-                        local distance = (LastMousePosition - pointPosition).Magnitude
-                        if distance < bestDistance and distance <= radius then
-                            bestPart, bestDistance = targetPart, distance
-                        end
-                    end
-                end
-            end
-        end
-        CurrentTarget = bestPart
-    end)
-
-    local function ApplyPrediction(cframe, offset)
-        return cframe * CFrame.new(offset.X, offset.Y, offset.Z)
-    end
-
-    if Capabilities[5] then
-        local success = pcall(function()
-            local metatable = getrawmetatable(game)
-            setreadonly(metatable, false)
-            local oldIndex = metatable.__index
-            metatable.__index = newcclosure(function(object, property)
-                if object:IsA("Mouse") and (property == "Hit" or property == "Target") then
-                    local target = CurrentTarget
-                    if target and SilentAimActive and SACfg["Enabled"] then
-                        local prediction = SACfg["Prediction"]
-                        local redirection = SACfg["Client Redirect"]
-                        local currentTool = (LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Tool")) or nil
-                        if redirection["Enabled"] and currentTool then
-                            local toolName = tostring(currentTool.Name)
-                            for _, weapon in ipairs(redirection["Weapons"]) do
-                                if string.find(string.lower(toolName), string.lower(weapon)) then
-                                    prediction = redirection["Prediction"]
-                                    break
-                                end
-                            end
-                        end
-                        local predictionMultiplier = Vector3.new(prediction["X"], prediction["Y"], prediction["Z"])
-                        local offset = target.Velocity * predictionMultiplier
-                        if property == "Hit" then
-                            return ApplyPrediction(target.CFrame, offset)
-                        else
-                            return target
-                        end
-                    end
-                end
-                return oldIndex(object, property)
-            end)
-        end)
-        if success then
-            print("[Silent Aim] Metatable hooking enabled with shiftlock fix")
-        else
-            warn("[Silent Aim] Metatable hooking failed, using basic mode")
-            ShowNotification("Silent Aim", "basic mode", 4)
-        end
-    else
-        warn("[Silent Aim] Metatable hooking not supported on this executor")
-        ShowNotification("Silent Aim", "limited mode (no metatable)", 4)
-    end
-
-    -- auto-clear locked target if they die or leave
-    RunService.Heartbeat:Connect(function()
-        if not LockedTarget then return end
-        local char = LockedTarget.Character
-        if not char then SilentAimActive = false; LockedTarget = nil; return end
-        local hum = char:FindFirstChildOfClass("Humanoid")
-        if not hum or hum.Health <= 0 then
-            SilentAimActive = false
-            LockedTarget    = nil
-            ShowNotification("Silent Aim", "target lost", 2)
-        end
-    end)
-end
-
--- ============================================================================
--- SPREAD MODIFICATIONS
--- ============================================================================
-local SpreadConfig = shared.MoozeV2["Weapon Modifications"]
-    and shared.MoozeV2["Weapon Modifications"]["Spread Changer"]
-
-local function ApplySpread()
-    if not SpreadConfig or not SpreadConfig["Enabled"] then return end
-    local function Norm(text) return tostring(text):lower():gsub("%W", "") end
-    for weaponKey, settings in pairs(SpreadConfig) do
-        if weaponKey ~= "Enabled" and type(settings) == "table" then
-            local val    = settings["Value"] or 1
-            local spread = 0.1 * val
-            local keyName = Norm(weaponKey)
-            for _, fn in ipairs(getgc(true)) do
-                if type(fn) == "function" and islclosure(fn) and not isexecutorclosure(fn) then
-                    local info = debug.getinfo(fn)
-                    if info and info.short_src and Norm(info.short_src):find(keyName, 1, true) then
-                        for idx, constant in ipairs(debug.getconstants(fn)) do
-                            if type(constant) == "number" and constant > 0 and constant < 0.3 then
-                                debug.setconstant(fn, idx, spread)
-                            end
-                        end
-                    end
-                end
-            end
-        end
-    end
-end
-
-ApplySpread()
-LocalPlayer.CharacterAdded:Connect(function()
-    task.wait(1)
-    ApplySpread()
-    BodyPartCache = {}
-end)
-
--- ============================================================================
--- ESP  (pattern from Vanta logic.lua)
--- ============================================================================
-local ESPLabels = {}
 
 local function PlayerDead(p)
     if not p.Character then return true end
-    local be = p.Character:FindFirstChild("BodyEffects")
+    local be=p.Character:FindFirstChild("BodyEffects")
     if be then
-        local d = be:FindFirstChild("Dead"); if d and d.Value then return true end
-        local k = be:FindFirstChild("K.O");  if k and k.Value then return true end
+        local d=be:FindFirstChild("Dead"); if d and d.Value then return true end
+        local k=be:FindFirstChild("K.O");  if k and k.Value then return true end
     end
-    local h = p.Character:FindFirstChildOfClass("Humanoid")
-    return h and h.Health <= 0
+    local h=p.Character:FindFirstChildOfClass("Humanoid")
+    return h and h.Health<=0
 end
 
 local function PlayerKnocked(p)
-    if not shared.MoozeV2["General"]["Checks"]["Knocked"] then return false end
+    if not CFG()["General"]["Checks"]["Knocked"] then return false end
     if not p.Character then return false end
-    local be = p.Character:FindFirstChild("BodyEffects")
-    if be then local k = be:FindFirstChild("K.O"); if k and k.Value then return true end end
+    local be=p.Character:FindFirstChild("BodyEffects")
+    if be then local k=be:FindFirstChild("K.O"); if k and k.Value then return true end end
     return false
 end
 
+-- ============================================================================
+-- ESP  (reads shared.MoozeV2["ESP"] live every frame)
+-- ============================================================================
+local ESPLabels = {}
+
 local function AddESP(player)
-    if player == LocalPlayer then return end
-    if ESPLabels[player.UserId] then return end
-    local espCfg = shared.MoozeV2["ESP"]
-    local e = { player = player, nameTag = Drawing.new("Text") }
-    e.nameTag.Size    = espCfg["Size"]
-    e.nameTag.Center  = true
-    e.nameTag.Outline = true
-    e.nameTag.Font    = Drawing.Fonts.UI
-    e.nameTag.Color   = espCfg["Color"]
-    e.nameTag.Visible = false
-    e.nameTag.ZIndex  = 1000
-    ESPLabels[player.UserId] = e
+    if player==LocalPlayer or ESPLabels[player.UserId] then return end
+    local e={player=player, tag=Drawing.new("Text")}
+    e.tag.Visible=false; e.tag.Center=true; e.tag.Outline=true
+    e.tag.Font=Drawing.Fonts.UI; e.tag.ZIndex=1000
+    e.tag.Size=CFG()["ESP"]["Size"]
+    e.tag.Color=CFG()["ESP"]["Color"]
+    ESPLabels[player.UserId]=e
 end
 
 local function RemoveESP(player)
-    local e = ESPLabels[player.UserId]
-    if e then pcall(function() e.nameTag:Remove() end); ESPLabels[player.UserId] = nil end
+    local e=ESPLabels[player.UserId]
+    if e then pcall(function() e.tag:Remove() end); ESPLabels[player.UserId]=nil end
 end
 
 local function RefreshESP()
-    local espCfg = shared.MoozeV2["ESP"]
+    local espCfg=CFG()["ESP"]
     if not espCfg["Enabled"] then
-        for _, e in pairs(ESPLabels) do e.nameTag.Visible = false end
-        return
+        for _,e in pairs(ESPLabels) do e.tag.Visible=false end; return
     end
-
-    for uid, e in pairs(ESPLabels) do
-        local p = e.player
+    for uid,e in pairs(ESPLabels) do
+        local p=e.player
         if not p or not p.Parent then
-            e.nameTag.Visible = false
-            pcall(function() e.nameTag:Remove() end)
-            ESPLabels[uid] = nil
-            continue
+            pcall(function() e.tag:Remove() end); ESPLabels[uid]=nil; continue
         end
-
-        if not p.Character or not p.Character:FindFirstChild("HumanoidRootPart") then
-            e.nameTag.Visible = false
-            continue
-        end
-
-        local hum = p.Character:FindFirstChildOfClass("Humanoid")
-        if not hum or hum.Health <= 0 then e.nameTag.Visible = false; continue end
-
-        -- position under feet using HumanoidRootPart - hipHeight
-        local hrp = p.Character:FindFirstChild("HumanoidRootPart")
-        local feetY = hrp.Position.Y - (hum.HipHeight + 1)
-        local worldFeet = Vector3.new(hrp.Position.X, feetY, hrp.Position.Z)
-        local lp, on = Camera:WorldToViewportPoint(worldFeet)
-
-        if on and lp.Z > 0 then
-            e.nameTag.Position = Vector2.new(lp.X, lp.Y + espCfg["Offset"])
-            local dn = p.DisplayName
-            e.nameTag.Text = (dn and dn ~= "") and dn or p.Name
-
-            -- red if this is the silent aim locked target
-            local isTarget = p == LockedTarget
-            e.nameTag.Color = isTarget and espCfg["Target Color"] or espCfg["Color"]
-            e.nameTag.Visible = true
+        local char=p.Character
+        if not char or PlayerDead(p) then e.tag.Visible=false; continue end
+        local hrp=char:FindFirstChild("HumanoidRootPart")
+        if not hrp then e.tag.Visible=false; continue end
+        local hum=char:FindFirstChildOfClass("Humanoid")
+        local feetY=hrp.Position.Y-(hum and (hum.HipHeight+1) or 3)
+        local sp,on=Camera:WorldToViewportPoint(Vector3.new(hrp.Position.X,feetY,hrp.Position.Z))
+        if on and sp.Z>0 then
+            e.tag.Position=Vector2.new(sp.X, sp.Y+espCfg["Offset"])
+            local dn=p.DisplayName
+            e.tag.Text=(dn and dn~="") and dn or p.Name
+            e.tag.Size=espCfg["Size"]
+            e.tag.Color=(p==SATarget) and espCfg["Target Color"] or espCfg["Color"]
+            e.tag.Visible=true
         else
-            e.nameTag.Visible = false
+            e.tag.Visible=false
         end
     end
 end
 
--- init
-for _, p in ipairs(Players:GetPlayers()) do AddESP(p) end
+for _,p in ipairs(Players:GetPlayers()) do AddESP(p) end
 Players.PlayerAdded:Connect(function(p)
-    if p ~= LocalPlayer then
+    if p~=LocalPlayer then
         AddESP(p)
         p.CharacterAdded:Connect(function() task.wait(0.1); RemoveESP(p); AddESP(p) end)
     end
 end)
 Players.PlayerRemoving:Connect(RemoveESP)
-
 RunService.Heartbeat:Connect(RefreshESP)
 
 -- ============================================================================
--- WALKSPEED
+-- TRIGGER BOT  (only runs if shared.MoozeV2["Trigger Bot"]["Enabled"] == true)
 -- ============================================================================
-local SpeedConfig = shared.MoozeV2["Player Modifications"]["Speed"]
+local TBActive = false  -- runtime toggle (keybind flips this)
+local TBLastShot = 0
+local TBStep = 0
 
-print("[Walkspeed] Enabled:", SpeedConfig["Enabled"])
-if SpeedConfig["Enabled"] then
-    print("[Walkspeed] Speed:", SpeedConfig["Default"]["Value"])
+local TBCircle = Drawing.new("Circle")
+TBCircle.Visible=false; TBCircle.Transparency=1; TBCircle.Color=Color3.new(1,1,1)
+TBCircle.Filled=true; TBCircle.NumSides=64
+TBCircle.Radius=CFG()["Trigger Bot"]["FOV"]*5
+TBCircle.Position=Vector2.new(Camera.ViewportSize.X/2,Camera.ViewportSize.Y/2)
 
-    local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-    local Humanoid  = Character:FindFirstChildOfClass("Humanoid") or Character:WaitForChild("Humanoid")
-    local Shooting  = false
-    local Reloading = false
-    local LowHealthThreshold = 50
-    local Mouse = LocalPlayer:GetMouse()
-
-    Mouse.Button1Down:Connect(function() Shooting = true end)
-    Mouse.Button1Up:Connect(function() Shooting = false end)
-
-    UserInputService.InputBegan:Connect(function(input, gameProcessed)
-        if gameProcessed then return end
-        if input.KeyCode == Enum.KeyCode.R and not Reloading then
-            Reloading = true
-            task.delay(1.5, function() Reloading = false end)
-        end
-    end)
-
-    LocalPlayer.CharacterAdded:Connect(function(character)
-        Character = character
-        Humanoid  = character:FindFirstChildOfClass("Humanoid") or character:WaitForChild("Humanoid")
-        Shooting  = false; Reloading = false
-    end)
-
-    RunService.RenderStepped:Connect(function()
-        if not SpeedConfig["Enabled"] then return end
-        if not Humanoid or Humanoid.Health <= 0 then return end
-        local speed = SpeedConfig["Default"]["Value"]
-        if Humanoid.Health < LowHealthThreshold then
-            speed = SpeedConfig["Low Health"]["Value"]
-        elseif Reloading then
-            speed = SpeedConfig["Reloading"]["Value"]
-        elseif Shooting then
-            speed = SpeedConfig["Shooting"]["Value"]
-        end
-        if Humanoid.WalkSpeed ~= speed then Humanoid.WalkSpeed = speed end
-    end)
-
-    ShowNotification("Walkspeed", "speed: " .. SpeedConfig["Default"]["Value"], 3)
-else
-    print("[Walkspeed] Disabled by config")
-end
-
--- ============================================================================
--- RAPID FIRE
--- ============================================================================
-local RapidFireConfig = shared.MoozeV2["Weapon Modifications"]["Rapid Fire"]
-
-print("[Rapid Fire] Enabled:", RapidFireConfig and RapidFireConfig["Enabled"] or false)
-if RapidFireConfig and RapidFireConfig["Enabled"] then
-    local CooldownProps = {"Cooldown", "FireRate", "ShootCooldown", "Delay", "ShootDelay"}
-    RunService.Heartbeat:Connect(function()
-        if not RapidFireConfig["Enabled"] then return end
-        local char = LocalPlayer.Character
-        local tool = char and char:FindFirstChildOfClass("Tool")
-        if not tool then return end
-        local cdv = RapidFireConfig["Cooldown"] or 0
-        for _, prop in ipairs(CooldownProps) do
-            local v = tool:FindFirstChild(prop)
-            if v and (v:IsA("NumberValue") or v:IsA("IntValue")) then v.Value = cdv end
-            local gc = tool:FindFirstChild("Configuration") or tool:FindFirstChild("GunConfig")
-            if gc then
-                local r = gc:FindFirstChild(prop)
-                if r and (r:IsA("NumberValue") or r:IsA("IntValue")) then r.Value = cdv end
+local function TBGetTarget()
+    local tbCfg=CFG()["Trigger Bot"]
+    local radius=tbCfg["FOV"]*5
+    local center=TBCircle.Position
+    local best,bd=nil,math.huge
+    for _,player in ipairs(Players:GetPlayers()) do
+        if player~=LocalPlayer and player.Character and not PlayerDead(player) and not PlayerKnocked(player) then
+            for _,part in ipairs(GetBodyParts(player.Character)) do
+                if part.Transparency<1 then
+                    local pos=part.Position
+                    if part.Name=="HumanoidRootPart" then
+                        local pred=tbCfg["Prediction"]
+                        pos=pos+Vector3.new(pred["X"],pred["Y"],pred["Z"])
+                        local vel=tbCfg["Velocity"]
+                        if vel and vel["Enabled"] then
+                            local v=part.Velocity
+                            if v.Magnitude>vel["Magnitude"] then pos=pos+v*0.1 end
+                        end
+                    end
+                    local sp,on=Camera:WorldToScreenPoint(pos)
+                    if on and sp.Z>0 then
+                        local d=(Vector2.new(sp.X,sp.Y)-center).Magnitude
+                        if d<=radius and d<bd then bd=d; best=player end
+                    end
+                end
             end
         end
+    end
+    return best
+end
+
+-- Trigger bot keybind - only registers if Enabled==true in config
+UserInputService.InputBegan:Connect(function(input,gp)
+    if gp then return end
+    if not CFG()["Trigger Bot"]["Enabled"] then return end  -- master switch
+    local bind=CFG()["Trigger Bot"]["Bind"]:upper()
+    if input.KeyCode==Enum.KeyCode[bind] then
+        if CFG()["Trigger Bot"]["Type"]=="Toggle" then
+            TBActive=not TBActive
+            ShowNotification("Trigger Bot", TBActive and "on" or "off", 2)
+        end
+    end
+end)
+UserInputService.InputEnded:Connect(function(input,gp)
+    if gp then return end
+    if not CFG()["Trigger Bot"]["Enabled"] then return end
+    if CFG()["Trigger Bot"]["Type"]=="Hold" then
+        local bind=CFG()["Trigger Bot"]["Bind"]:upper()
+        if input.KeyCode==Enum.KeyCode[bind] then TBActive=false end
+    end
+end)
+
+RunService.Heartbeat:Connect(function(dt)
+    TBStep=TBStep+dt
+    if TBStep<0.05 then return end; TBStep=0
+    local tbCfg=CFG()["Trigger Bot"]
+    -- master switch from config
+    if not tbCfg["Enabled"] then TBCircle.Visible=false; return end
+    if not TBActive then TBCircle.Visible=false; return end
+    TBCircle.Radius=tbCfg["FOV"]*5
+    TBCircle.Position=Vector2.new(Camera.ViewportSize.X/2,Camera.ViewportSize.Y/2)
+    local target=TBGetTarget()
+    if target and LocalPlayer.Character then
+        local tool=LocalPlayer.Character:FindFirstChildOfClass("Tool")
+        if tool and tool:FindFirstChild("Handle") then
+            local function clean(s) return s:lower():gsub("[%[%]%- ]","") end
+            local tn=clean(tool.Name); local ok=false
+            for _,w in ipairs(tbCfg["Weapons"]) do if tn:find(clean(w),1,true) then ok=true; break end end
+            if ok and tick()-TBLastShot>=tbCfg["Cooldown"] then
+                tool:Activate(); tool:Deactivate(); TBLastShot=tick()
+            end
+        end
+    end
+end)
+
+-- ============================================================================
+-- CAMERA LOCK  (only runs if shared.MoozeV2["Camera Lock"]["Enabled"] == true)
+-- ============================================================================
+local function IsKnockedOut(char)
+    if not char then return false end
+    local be=char:FindFirstChild("BodyEffects")
+    if be then local k=be:FindFirstChild("K.O"); if k and k.Value then return true end end
+    local hum=char:FindFirstChildOfClass("Humanoid")
+    if hum then
+        local s=hum:GetState()
+        if s==Enum.HumanoidStateType.Dead or s==Enum.HumanoidStateType.Physics or s==Enum.HumanoidStateType.Ragdoll then return true end
+    end
+    local hrp=char:FindFirstChild("HumanoidRootPart")
+    if hrp and hrp:FindFirstChild("GRABBING_CONSTRAINT") then return true end
+    return false
+end
+
+UserInputService.InputBegan:Connect(function(input,gp)
+    if gp then return end
+    if not CFG()["Camera Lock"]["Enabled"] then return end  -- master switch
+    local bind=CFG()["General"]["Binds"]["Camera Lock"]:upper()
+    if input.KeyCode~=Enum.KeyCode[bind] then return end
+    if CamLocked then
+        CamLocked=false; CamTarget=nil
+        ShowNotification("Camera Lock","off",2)
+    else
+        local best,bd=nil,math.huge
+        local mp=UserInputService:GetMouseLocation()
+        for _,p in ipairs(Players:GetPlayers()) do
+            if p~=LocalPlayer and p.Character and not IsKnockedOut(p.Character) then
+                local hrp=p.Character:FindFirstChild("HumanoidRootPart")
+                if hrp then
+                    local sp,on=Camera:WorldToViewportPoint(hrp.Position)
+                    if on and sp.Z>0 then
+                        local d=(Vector2.new(sp.X,sp.Y)-mp).Magnitude
+                        if d<bd then bd=d; best=hrp end
+                    end
+                end
+            end
+        end
+        if best then
+            CamLocked=true; CamTarget=best
+            local pl=Players:GetPlayerFromCharacter(best.Parent)
+            ShowNotification("Camera Lock", pl and pl.Name or "locked", 2)
+        else
+            ShowNotification("Camera Lock","no target near mouse",2)
+        end
+    end
+end)
+
+RunService.RenderStepped:Connect(function()
+    if not CFG()["Camera Lock"]["Enabled"] then return end  -- master switch
+    if not CamLocked or not CamTarget then return end
+    -- validate target still alive
+    local char=CamTarget.Parent
+    if not char or IsKnockedOut(char) then
+        CamLocked=false; CamTarget=nil
+        ShowNotification("Camera Lock","target lost",2); return
+    end
+    Camera.CFrame=CFrame.new(Camera.CFrame.Position,CamTarget.Position)
+end)
+
+-- ============================================================================
+-- SILENT AIM  (only active if shared.MoozeV2["Silent Aim"]["Enabled"] == true)
+-- ============================================================================
+local SACurrentTarget = nil  -- the body part being aimed at
+local SALastMousePos  = Vector2.new(0,0)
+local SALastUpdate    = 0
+
+local SACircle = Drawing.new("Circle")
+SACircle.Transparency=1; SACircle.Thickness=1.5; SACircle.Color=Color3.new(1,1,1)
+SACircle.NumSides=128; SACircle.Filled=false
+SACircle.Radius=CFG()["Silent Aim"]["FOV"]["Size"]*5
+SACircle.Visible=CFG()["Silent Aim"]["Enabled"] and CFG()["Silent Aim"]["FOV"]["Enabled"] and CFG()["Silent Aim"]["FOV"]["Visible"]
+
+local function SAIsShiftLock()
+    if LocalPlayer.Character then
+        local tool=LocalPlayer.Character:FindFirstChildOfClass("Tool")
+        if tool and tool:FindFirstChild("Ammo") then return true end
+    end
+    local pg=LocalPlayer:FindFirstChildOfClass("PlayerGui")
+    if pg then local ag=pg:FindFirstChild("Aim"); if ag and ag.Visible then return true end end
+    local mouse=LocalPlayer:GetMouse()
+    if mouse.Icon=="rbxasset://SystemCursors/Cross" then return true end
+    local pm=LocalPlayer.PlayerScripts:FindFirstChild("PlayerModule")
+    if pm then
+        local cm=pm:FindFirstChild("CameraModule")
+        if cm then
+            local mlc=cm:FindFirstChild("MouseLockController")
+            if mlc then local iml=mlc:FindFirstChild("isMouseLocked"); if iml and iml.Value then return true end end
+        end
+    end
+    return false
+end
+
+local function SAGetClosestPoint(player)
+    local best,bd=nil,math.huge
+    local scale=(CFG()["Silent Aim"]["Closest Point"] or {})["Scale"] or 1.0
+    if player.Character then
+        for _,part in ipairs(GetBodyParts(player.Character)) do
+            local sp,on=Camera:WorldToViewportPoint(part.Position)
+            if on and sp.Z>0 then
+                local d=(SALastMousePos-Vector2.new(sp.X,sp.Y)).Magnitude*scale
+                if d<bd then best=part; bd=d end
+            end
+        end
+    end
+    return best
+end
+
+-- FOV circle: every render frame, zero throttle
+RunService.RenderStepped:Connect(function()
+    local saCfg=CFG()["Silent Aim"]
+    local fovCfg=saCfg["FOV"]
+    SACircle.Visible = saCfg["Enabled"] and fovCfg["Enabled"] and fovCfg["Visible"]
+    if not SACircle.Visible then return end
+    if SAIsShiftLock() then
+        local c=Vector2.new(Camera.ViewportSize.X*0.5,Camera.ViewportSize.Y*0.5)
+        SACircle.Position=c; SALastMousePos=c
+    else
+        local mp=UserInputService:GetMouseLocation()
+        SACircle.Position=mp; SALastMousePos=mp
+    end
+end)
+
+-- Target finding: throttled
+RunService.Heartbeat:Connect(function(dt)
+    SALastUpdate=SALastUpdate+dt
+    if SALastUpdate<0.033 then return end; SALastUpdate=0
+    local saCfg=CFG()["Silent Aim"]
+    if not saCfg["Enabled"] then SACurrentTarget=nil; return end
+
+    local fovCfg=saCfg["FOV"]
+    local radius=fovCfg["Size"]*5
+    if fovCfg["Weapons"]["Enabled"] then
+        local tool=LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Tool")
+        if tool then
+            local wn=string.lower(tool.Name or "")
+            if string.find(wn,"shotgun") then radius=fovCfg["Weapons"]["Shotguns"]*5
+            elseif string.find(wn,"pistol") then radius=fovCfg["Weapons"]["Pistols"]*5 end
+        end
+    end
+    SACircle.Radius=radius
+
+    -- if we have a locked target, only aim at them
+    if SATarget then
+        if PlayerDead(SATarget) or PlayerKnocked(SATarget) then
+            SATarget=nil; SAActive=false
+            ShowNotification("Silent Aim","target lost",2); SACurrentTarget=nil; return
+        end
+        local hp=saCfg["Hit Part"]
+        local part = hp=="Closest Point" and SAGetClosestPoint(SATarget)
+            or SATarget.Character and SATarget.Character:FindFirstChild(hp or "Head")
+        SACurrentTarget=part; return
+    end
+
+    SACurrentTarget=nil
+end)
+
+-- Keybind: press to lock nearest in FOV, press again to unlock
+UserInputService.InputBegan:Connect(function(input,gp)
+    if gp then return end
+    if not CFG()["Silent Aim"]["Enabled"] then return end  -- master switch
+    local bind=CFG()["General"]["Binds"]["Silent Aim"]:upper()
+    if input.KeyCode~=Enum.KeyCode[bind] then return end
+    if SATarget then
+        SATarget=nil; SAActive=false
+        ShowNotification("Silent Aim","untargeted",2)
+    else
+        local best,bd=nil,math.huge
+        local mp=UserInputService:GetMouseLocation()
+        local radius=CFG()["Silent Aim"]["FOV"]["Size"]*5
+        for _,p in ipairs(Players:GetPlayers()) do
+            if p~=LocalPlayer and p.Character and not PlayerDead(p) and not PlayerKnocked(p) then
+                local hrp=p.Character:FindFirstChild("HumanoidRootPart")
+                if hrp then
+                    local sp,on=Camera:WorldToViewportPoint(hrp.Position)
+                    if on and sp.Z>0 then
+                        local d=(Vector2.new(sp.X,sp.Y)-mp).Magnitude
+                        if d<=radius and d<bd then bd=d; best=p end
+                    end
+                end
+            end
+        end
+        if best then
+            SATarget=best; SAActive=true
+            ShowNotification("Silent Aim","targeting "..best.Name,2)
+        else
+            ShowNotification("Silent Aim","no target in FOV",2)
+        end
+    end
+end)
+
+-- Metatable hook
+if Capabilities[5] then
+    local ok=pcall(function()
+        local mt=getrawmetatable(game)
+        setreadonly(mt,false)
+        local oldIdx=mt.__index
+        mt.__index=newcclosure(function(obj,key)
+            if obj:IsA("Mouse") and (key=="Hit" or key=="Target") then
+                local saCfg=CFG()["Silent Aim"]
+                local target=SACurrentTarget
+                if target and SAActive and saCfg["Enabled"] then
+                    local pred=saCfg["Prediction"]
+                    local redir=saCfg["Client Redirect"]
+                    local tool=LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Tool")
+                    if redir["Enabled"] and tool then
+                        for _,w in ipairs(redir["Weapons"]) do
+                            if string.find(string.lower(tostring(tool.Name)),string.lower(w)) then
+                                pred=redir["Prediction"]; break
+                            end
+                        end
+                    end
+                    local offset=target.Velocity*Vector3.new(pred["X"],pred["Y"],pred["Z"])
+                    local cf=target.CFrame*CFrame.new(offset.X,offset.Y,offset.Z)
+                    if key=="Hit" then return cf else return target end
+                end
+            end
+            return oldIdx(obj,key)
+        end)
     end)
-    ShowNotification("Rapid Fire", "cooldown → " .. (RapidFireConfig["Cooldown"] or 0), 3)
+    if ok then print("[Silent Aim] Metatable hook enabled")
+    else warn("[Silent Aim] Metatable hook failed"); ShowNotification("Silent Aim","basic mode",4) end
 else
-    print("[Rapid Fire] Disabled by config")
+    warn("[Silent Aim] Not supported"); ShowNotification("Silent Aim","limited mode",4)
 end
 
 -- ============================================================================
--- DONE
+-- SPREAD CHANGER  (only runs if shared.MoozeV2["Weapon Modifications"]["Spread Changer"]["Enabled"] == true)
 -- ============================================================================
-print("[Mooze] Script loaded successfully!")
-print("[Mooze] Executor:", ExecutorName)
-print("[Mooze] Features:", Capabilities[5] and "Full" or "Limited")
+local function ApplySpread()
+    local sc=CFG()["Weapon Modifications"]["Spread Changer"]
+    if not sc["Enabled"] then return end
+    local function norm(s) return tostring(s):lower():gsub("%W","") end
+    for wk,ws in pairs(sc) do
+        if wk~="Enabled" and type(ws)=="table" then
+            local spread=0.1*(ws["Value"] or 1)
+            local kn=norm(wk)
+            for _,fn in ipairs(getgc(true)) do
+                if type(fn)=="function" and islclosure(fn) and not isexecutorclosure(fn) then
+                    local info=debug.getinfo(fn)
+                    if info and info.short_src and norm(info.short_src):find(kn,1,true) then
+                        for idx,c in ipairs(debug.getconstants(fn)) do
+                            if type(c)=="number" and c>0 and c<0.3 then
+                                debug.setconstant(fn,idx,spread)
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
+ApplySpread()
+LocalPlayer.CharacterAdded:Connect(function() task.wait(1); ApplySpread(); BodyPartCache={} end)
+
+-- ============================================================================
+-- WALKSPEED  (only runs if shared.MoozeV2["Player Modifications"]["Speed"]["Enabled"] == true)
+-- ============================================================================
+do
+    local spd=CFG()["Player Modifications"]["Speed"]
+    if spd["Enabled"] then
+        local char=LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+        local hum=char:FindFirstChildOfClass("Humanoid") or char:WaitForChild("Humanoid")
+        local shooting,reloading=false,false
+        local mouse=LocalPlayer:GetMouse()
+        mouse.Button1Down:Connect(function() shooting=true end)
+        mouse.Button1Up:Connect(function() shooting=false end)
+        UserInputService.InputBegan:Connect(function(input,gp)
+            if gp then return end
+            if input.KeyCode==Enum.KeyCode.R and not reloading then
+                reloading=true; task.delay(1.5,function() reloading=false end)
+            end
+        end)
+        LocalPlayer.CharacterAdded:Connect(function(c)
+            char=c; hum=c:FindFirstChildOfClass("Humanoid") or c:WaitForChild("Humanoid")
+            shooting=false; reloading=false
+        end)
+        RunService.RenderStepped:Connect(function()
+            local s=CFG()["Player Modifications"]["Speed"]
+            if not s["Enabled"] then
+                if hum then hum.WalkSpeed=16 end; return
+            end
+            if not hum or hum.Health<=0 then return end
+            local speed=s["Default"]["Value"]
+            if hum.Health<50 then speed=s["Low Health"]["Value"]
+            elseif reloading then speed=s["Reloading"]["Value"]
+            elseif shooting then speed=s["Shooting"]["Value"] end
+            if hum.WalkSpeed~=speed then hum.WalkSpeed=speed end
+        end)
+        ShowNotification("Walkspeed","speed: "..spd["Default"]["Value"],3)
+    end
+end
+
+-- ============================================================================
+-- RAPID FIRE  (only runs if shared.MoozeV2["Weapon Modifications"]["Rapid Fire"]["Enabled"] == true)
+-- ============================================================================
+do
+    local rf=CFG()["Weapon Modifications"]["Rapid Fire"]
+    if rf["Enabled"] then
+        local props={"Cooldown","FireRate","ShootCooldown","Delay","ShootDelay"}
+        RunService.Heartbeat:Connect(function()
+            if not CFG()["Weapon Modifications"]["Rapid Fire"]["Enabled"] then return end
+            local char=LocalPlayer.Character
+            local tool=char and char:FindFirstChildOfClass("Tool")
+            if not tool then return end
+            local cdv=CFG()["Weapon Modifications"]["Rapid Fire"]["Cooldown"] or 0
+            for _,prop in ipairs(props) do
+                local v=tool:FindFirstChild(prop)
+                if v and (v:IsA("NumberValue") or v:IsA("IntValue")) then v.Value=cdv end
+                local gc=tool:FindFirstChild("Configuration") or tool:FindFirstChild("GunConfig")
+                if gc then local r=gc:FindFirstChild(prop); if r and (r:IsA("NumberValue") or r:IsA("IntValue")) then r.Value=cdv end end
+            end
+        end)
+        ShowNotification("Rapid Fire","cooldown: "..(rf["Cooldown"] or 0),3)
+    end
+end
+
+print("[Mooze] Loaded. Executor: "..ExecutorName)
+print("[Mooze] Features: "..(Capabilities[5] and "Full" or "Limited"))
