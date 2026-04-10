@@ -233,7 +233,7 @@ local function MakeLabel()
     t.Center  = true
     t.Outline = true
     t.Font    = Drawing.Fonts.UI
-    t.Size    = 13
+    t.Size    = 18
     t.ZIndex  = 1000
     t.Color   = Color3.fromRGB(255, 255, 255)
     return t
@@ -268,7 +268,7 @@ local function UpdateLabels()
     -- "Vyron.cc" header
     LabelTitle.Color    = Color3.fromRGB(255, 255, 255)
     LabelTitle.Outline  = true
-    LabelTitle.Size     = 13
+    LabelTitle.Size     = 18
     LabelTitle.Center   = true
     LabelTitle.Visible  = true
     LabelTitle.Text     = 'Vyron.cc'
@@ -279,7 +279,7 @@ local function UpdateLabels()
     if CFG()["Silent Aim"]["Enabled"] and VyronState.SilentAim then
         LabelOne.Color    = Color3.fromRGB(255, 255, 255)
         LabelOne.Outline  = true
-        LabelOne.Size     = 13
+        LabelOne.Size     = 18
         LabelOne.Center   = true
         LabelOne.Visible  = true
         LabelOne.Text     = 'Silent Aim'
@@ -288,7 +288,7 @@ local function UpdateLabels()
         local targetName = SATarget and ('(' .. SATarget.DisplayName .. ')') or '(N/A)'
         LabelOneSub.Color    = Color3.fromRGB(0, 255, 0)
         LabelOneSub.Outline  = true
-        LabelOneSub.Size     = 13
+        LabelOneSub.Size     = 18
         LabelOneSub.Center   = false
         LabelOneSub.Visible  = true
         LabelOneSub.Text     = targetName
@@ -303,7 +303,7 @@ local function UpdateLabels()
     if CFG()["Trigger Bot"]["Enabled"] and TBActive then
         LabelTwo.Color    = Color3.fromRGB(255, 255, 255)
         LabelTwo.Outline  = true
-        LabelTwo.Size     = 13
+        LabelTwo.Size     = 18
         LabelTwo.Center   = true
         LabelTwo.Visible  = true
         LabelTwo.Text     = 'Trigger Bot'
@@ -317,7 +317,7 @@ local function UpdateLabels()
     if CFG()["Player Modifications"]["Speed"]["Enabled"] and VyronState.Speed then
         LabelThree.Color    = Color3.fromRGB(255, 255, 255)
         LabelThree.Outline  = true
-        LabelThree.Size     = 13
+        LabelThree.Size     = 18
         LabelThree.Center   = true
         LabelThree.Visible  = true
         LabelThree.Text     = 'WalkSpeed'
@@ -331,7 +331,7 @@ local function UpdateLabels()
     if CFG()["Weapon Modifications"]["Double Tap"]["Enabled"] and VyronState.DoubleTap then
         LabelFour.Color    = Color3.fromRGB(255, 255, 255)
         LabelFour.Outline  = true
-        LabelFour.Size     = 13
+        LabelFour.Size     = 18
         LabelFour.Center   = true
         LabelFour.Visible  = true
         LabelFour.Text     = 'Double Tap'
@@ -345,7 +345,7 @@ local function UpdateLabels()
     if CFG()["Camera Lock"]["Enabled"] and VyronState.CamLock then
         LabelFive.Color    = Color3.fromRGB(255, 255, 255)
         LabelFive.Outline  = true
-        LabelFive.Size     = 13
+        LabelFive.Size     = 18
         LabelFive.Center   = true
         LabelFive.Visible  = true
         LabelFive.Text     = 'Cam Lock'
@@ -354,7 +354,7 @@ local function UpdateLabels()
             local camName = '(' .. (CamTarget.Parent.DisplayName or CamTarget.Parent.Name) .. ')'
             LabelFiveSub.Color    = Color3.fromRGB(0, 255, 0)
             LabelFiveSub.Outline  = true
-            LabelFiveSub.Size     = 13
+            LabelFiveSub.Size     = 18
             LabelFiveSub.Center   = false
             LabelFiveSub.Visible  = true
             LabelFiveSub.Text     = camName
