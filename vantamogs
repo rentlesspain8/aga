@@ -458,20 +458,17 @@ local oldIndex = grm.__index
 setreadonly(grm, false)
 grm.__index = function(self, key)
     if not checkcaller() and self == Mouse then
-        -- Only redirect aim-related keys, and only when actually shooting (mouse held)
-        -- This prevents the crosshair from freezing during normal camera movement
-        if isMouseDown and (key == "Hit" or key == "Target" or key == "UnitRay" or key == "Origin") then
+        if key == "Hit" or key == "Target" or key == "UnitRay" or key == "Origin" then
             local part, pos = GetSilentAimData()
             if part and pos then
                 local delta = pos - Camera.CFrame.Position
-                if delta.Magnitude < 1e-4 then
-                    return oldIndex(self, key)
+                if delta.Magnitude >= 1e-4 then
+                    local dir = delta.Unit
+                    if key == "Hit"      then return CF(pos, pos + dir)
+                    elseif key == "Target"   then return part
+                    elseif key == "UnitRay"  then return Ray.new(Camera.CFrame.Position, dir)
+                    elseif key == "Origin"   then return Camera.CFrame.Position end
                 end
-                local dir = delta.Unit
-                if key == "Hit"     then return CF(pos, pos + dir)
-                elseif key == "Target"  then return part
-                elseif key == "UnitRay" then return Ray.new(Camera.CFrame.Position, dir)
-                elseif key == "Origin"  then return Camera.CFrame.Position end
             end
         end
     end
