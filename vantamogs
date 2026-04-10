@@ -205,6 +205,7 @@ local VyronState = {
     CamLock    = false,
 }
 
+local LabelTitle = nil  -- "Vyron.cc" header
 local LabelOne   = nil
 local LabelTwo   = nil
 local LabelThree = nil
@@ -225,6 +226,7 @@ end
 
 local function UpdateLabels()
     if not CFG()["General"]["Show Hotkeys"] then
+        if LabelTitle then LabelTitle.Visible = false end
         if LabelOne   then LabelOne.Visible   = false end
         if LabelTwo   then LabelTwo.Visible   = false end
         if LabelThree then LabelThree.Visible = false end
@@ -234,6 +236,7 @@ local function UpdateLabels()
     end
 
     -- lazy-create labels (same pattern as reference LabelOne..LabelFive)
+    if LabelTitle == nil then LabelTitle = MakeLabel() end
     if LabelOne   == nil then LabelOne   = MakeLabel() end
     if LabelTwo   == nil then LabelTwo   = MakeLabel() end
     if LabelThree == nil then LabelThree = MakeLabel() end
@@ -241,8 +244,18 @@ local function UpdateLabels()
     if LabelFive  == nil then LabelFive  = MakeLabel() end
 
     local vp      = Camera.ViewportSize
-    -- anchor near bottom: start 120px up from bottom, stack down 15px per label
-    local offsetY = vp.Y - 120
+    -- anchor higher up from the bottom
+    local offsetY = vp.Y - 160
+
+    -- "Vyron.cc" header — always visible when Show Hotkeys is on
+    LabelTitle.Color    = Color3.fromRGB(143, 174, 211)
+    LabelTitle.Outline  = true
+    LabelTitle.Size     = 20
+    LabelTitle.Center   = true
+    LabelTitle.Visible  = true
+    LabelTitle.Text     = 'Vyron.cc'
+    LabelTitle.Position = Vector2.new(vp.X / 2, offsetY)
+    offsetY = offsetY + 20
 
     -- Silent Aim (label 1)
     if CFG()["Silent Aim"]["Enabled"] and VyronState.SilentAim then
