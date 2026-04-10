@@ -245,7 +245,6 @@ end
 -- ============================================================================
 local Config         = shared.MoozeV2
 local TriggerConfig  = Config["Trigger Bot"]
-local VelocityConfig = Config["Velocity Calculation"]
 
 local TriggerCircle = Drawing.new("Circle")
 TriggerCircle.Visible      = false
@@ -278,9 +277,10 @@ local function GetTargetInFOV()
                     if part.Name == "HumanoidRootPart" then
                         local pred = TriggerConfig["Prediction"]
                         position = position + Vector3.new(pred["X"], pred["Y"], pred["Z"])
-                        if VelocityConfig and VelocityConfig["Enabled"] then
+                        local velCfg = TriggerConfig["Velocity"]
+                        if velCfg and velCfg["Enabled"] then
                             local velocity = part.Velocity
-                            if velocity.Magnitude > VelocityConfig["Magnitude"] then
+                            if velocity.Magnitude > velCfg["Magnitude"] then
                                 position = position + velocity * 0.1
                             end
                         end
@@ -441,7 +441,7 @@ do
     local Mouse             = LocalPlayer:GetMouse()
     local LastMousePosition = Vector2.new(0, 0)
     local CurrentTarget     = nil
-    local SilentAimActive   = false
+    local SilentAimActive   = SACfg["Enabled"] == true
 
     -- keybind toggle
     local SAKey = Enum.KeyCode[shared.MoozeV2["General"]["Binds"]["Silent Aim"]:upper()]
