@@ -548,7 +548,7 @@ else
 end
 
 -- ============================================================================
--- SPREAD CHANGER  (hooks math.random globally — works on all weapons)
+-- SPREAD CHANGER  (0 spread — forces all random spread calls to 0)
 -- ============================================================================
 do
     local sc=CFG()["Weapon Modifications"]["Spread Changer"]
@@ -560,14 +560,45 @@ do
                 local scCfg=CFG()["Weapon Modifications"]["Spread Changer"]
                 if not scCfg["Enabled"] then return oldRandom(...) end
                 local args={...}
-                -- intercept spread calls: math.random() or math.random(-x, x) patterns
-                if #args==0 or (args[1] and type(args[1])=="number" and args[1]<0) then
-                    local amt=scCfg["Amount"] or 0
-                    -- amt=0 means 0 spread, scale up from there
+                local amt=scCfg["Amount"] or 0
+                -- catch all float/spread patterns:
+                -- math.random()           → 0..1 float, used as spread multiplier
+                -- math.random(-n, n)      → symmetric spread range
+                -- math.random(0, n)       → one-sided spread
+                if #args==0 then
+                    -- pure float call — return 0 (no spread offset)
                     if amt==0 then return 0 end
-                    return oldRandom(...) * (amt/100)
+                    return oldRandom() * (amt/100)
+                elseif #args==2 then
+                    local a,b=args[1],args[2]
+                    if type(a)=="number" and type(b)=="number" then
+                        -- symmetric: (-n, n) → return 0 midpoint
+                        if a<0 and b>0 then
+                            if amt==0 then return 0 end
+                            -- scale toward 0: lerp result toward midpoint
+                            local raw=oldRandom(a,b)
+                            return math.floor(raw*(amt/100)+0.5)
+                        end
+                        -- non-spread integer range (e.g. random(1,6)) — pass through
+                        if a>=1 and b>=1 and b-a>=1 then
+                            return oldRandom(a,b)
+                        end
+                    end
                 end
                 return oldRandom(...)
+            end)
+        end)
+
+        -- also hook math.noise which some guns use for spread patterns
+        local oldNoise
+        pcall(function()
+            oldNoise=hookfunction(math.noise,function(...)
+                if checkcaller() then return oldNoise(...) end
+                local scCfg=CFG()["Weapon Modifications"]["Spread Changer"]
+                if not scCfg["Enabled"] then return oldNoise(...) end
+                local amt=scCfg["Amount"] or 0
+                if amt==0 then return 0 end
+                return oldNoise(...) * (amt/100)
             end)
         end)
     end
