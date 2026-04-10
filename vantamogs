@@ -548,52 +548,62 @@ else
 end
 
 -- ============================================================================
--- SPREAD CHANGER  (zeroes spread constants directly in gun closures)
+-- SPREAD CHANGER  (zeroes spread constants in the equipped gun's closures only)
 -- ============================================================================
 do
     local sc=CFG()["Weapon Modifications"]["Spread Changer"]
     if sc["Enabled"] then
-        local function ZeroSpread()
+        local function ZeroSpreadOnTool(tool)
             local scCfg=CFG()["Weapon Modifications"]["Spread Changer"]
-            if not scCfg["Enabled"] then return end
+            if not scCfg["Enabled"] or not tool then return end
             local amt=(scCfg["Amount"] or 0)/100
-            for _,fn in ipairs(getgc(true)) do
-                if type(fn)~="function" or not islclosure(fn) then continue end
-                if isexecutorclosure and isexecutorclosure(fn) then continue end
-                local ok,consts=pcall(debug.getconstants,fn)
-                if not ok or not consts then continue end
-                for idx,c in ipairs(consts) do
-                    if type(c)=="number" and c>0 and c<=0.5 and c==c then
-                        -- looks like a spread constant (small positive float)
-                        pcall(debug.setconstant,fn,idx,c*amt)
+            -- only scan scripts inside the tool, not the entire game
+            for _,obj in ipairs(tool:GetDescendants()) do
+                if not (obj:IsA("LocalScript") or obj:IsA("ModuleScript")) then continue end
+                local ok,fn=pcall(function() return require and obj end)
+                -- walk closures via getgc scoped to just this tool's functions
+            end
+            -- use getgc but filter strictly to closures whose source matches the tool
+            local toolName=tool.Name:lower():gsub("[%s%-]","")
+            pcall(function()
+                for _,fn in ipairs(getgc(false)) do
+                    if type(fn)~="function" or not islclosure(fn) then continue end
+                    if isexecutorclosure and isexecutorclosure(fn) then continue end
+                    local info=debug.getinfo(fn,"S")
+                    if not info or not info.short_src then continue end
+                    local src=info.short_src:lower():gsub("[%s%-]","")
+                    -- only patch closures whose source file name contains the tool name
+                    if not src:find(toolName,1,true) then continue end
+                    local ok2,consts=pcall(debug.getconstants,fn)
+                    if not ok2 or not consts then continue end
+                    for idx,c in ipairs(consts) do
+                        if type(c)=="number" and c>0 and c<=0.5 then
+                            pcall(debug.setconstant,fn,idx,c*amt)
+                        end
                     end
                 end
-            end
+            end)
         end
 
-        -- run immediately and on every respawn
-        task.spawn(ZeroSpread)
-        Players.LocalPlayer.CharacterAdded:Connect(function()
-            task.wait(0.5)
-            ZeroSpread()
-        end)
-        -- re-apply when a new tool is equipped (weapon swap)
-        Players.LocalPlayer.CharacterAdded:Connect(function(char)
+        local function WatchChar(char)
+            if not char then return end
+            -- apply to any tool already held
+            for _,child in ipairs(char:GetChildren()) do
+                if child:IsA("Tool") then task.spawn(ZeroSpreadOnTool,child) end
+            end
             char.ChildAdded:Connect(function(child)
                 if child:IsA("Tool") then
                     task.wait(0.1)
-                    ZeroSpread()
-                end
-            end)
-        end)
-        if Players.LocalPlayer.Character then
-            Players.LocalPlayer.Character.ChildAdded:Connect(function(child)
-                if child:IsA("Tool") then
-                    task.wait(0.1)
-                    ZeroSpread()
+                    ZeroSpreadOnTool(child)
                 end
             end)
         end
+
+        WatchChar(Players.LocalPlayer.Character)
+        Players.LocalPlayer.CharacterAdded:Connect(function(char)
+            task.wait(0.3)
+            WatchChar(char)
+        end)
     end
 end
 
