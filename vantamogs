@@ -35,13 +35,6 @@ local function ShowNotification(title, message, duration)
     pcall(function() gui.Parent = Services.CoreGui end)
     if not gui.Parent then gui.Parent = Services.Players.LocalPlayer:WaitForChild("PlayerGui") end
 
-    -- outer glow / bloom behind card
-    local bloom = Instance.new("Frame")
-    bloom.Size = UDim2.new(0,310,0,90); bloom.Position = UDim2.new(1,10,1,-95)
-    bloom.BackgroundColor3 = Color3.fromRGB(130,60,255); bloom.BackgroundTransparency = 0.82
-    bloom.BorderSizePixel = 0; bloom.Parent = gui
-    Instance.new("UICorner",bloom).CornerRadius = UDim.new(0,18)
-
     -- main card
     local card = Instance.new("Frame")
     card.Size = UDim2.new(0,290,0,70); card.Position = UDim2.new(1,10,1,-90)
@@ -52,20 +45,6 @@ local function ShowNotification(title, message, duration)
     local stroke = Instance.new("UIStroke")
     stroke.Color = Color3.fromRGB(140,70,255); stroke.Thickness = 1
     stroke.Transparency = 0.45; stroke.Parent = card
-
-    -- soft purple inner glow on left
-    local innerGlow = Instance.new("Frame")
-    innerGlow.Size = UDim2.new(0,72,1,0); innerGlow.Position = UDim2.new(0,0,0,0)
-    innerGlow.BackgroundColor3 = Color3.fromRGB(110,40,220)
-    innerGlow.BackgroundTransparency = 0.88; innerGlow.BorderSizePixel = 0; innerGlow.Parent = card
-    Instance.new("UICorner",innerGlow).CornerRadius = UDim.new(0,12)
-
-    -- ── V logo: outer ring glow (slightly larger, more transparent) ──
-    local ringGlow = Instance.new("Frame")
-    ringGlow.Size = UDim2.new(0,46,0,46); ringGlow.Position = UDim2.new(0,12,0.5,-23)
-    ringGlow.BackgroundColor3 = Color3.fromRGB(160,60,255); ringGlow.BackgroundTransparency = 0.55
-    ringGlow.BorderSizePixel = 0; ringGlow.Parent = card
-    Instance.new("UICorner",ringGlow).CornerRadius = UDim.new(1,0)
 
     -- outer ring (dark fill, purple stroke = circle outline)
     local ring = Instance.new("Frame")
@@ -81,7 +60,6 @@ local function ShowNotification(title, message, duration)
     vLabel.Size = UDim2.new(1,0,1,0); vLabel.BackgroundTransparency = 1
     vLabel.Text = "V"; vLabel.Font = Enum.Font.GothamBlack
     vLabel.TextColor3 = Color3.fromRGB(200,100,255); vLabel.TextSize = 17
-    vLabel.TextStrokeColor3 = Color3.fromRGB(120,30,200); vLabel.TextStrokeTransparency = 0.4
     vLabel.Parent = ring
 
     -- left accent bar
@@ -122,9 +100,8 @@ local function ShowNotification(title, message, duration)
     local eOut  = TweenInfo.new(0.25, Enum.EasingStyle.Quart,  Enum.EasingDirection.In)
     local eProg = TweenInfo.new(dur,  Enum.EasingStyle.Linear, Enum.EasingDirection.Out)
 
-    -- slide in card + bloom
+    -- slide in card
     ts:Create(card,  eIn, {Position=UDim2.new(1,-300,1,-90)}):Play()
-    ts:Create(bloom, eIn, {Position=UDim2.new(1,-315,1,-95)}):Play()
     -- drain progress bar
     ts:Create(fill, eProg, {Size=UDim2.new(0,0,1,0)}):Play()
 
@@ -135,8 +112,7 @@ local function ShowNotification(title, message, duration)
     spinConn = game:GetService("RunService").RenderStepped:Connect(function(dt)
         if not spinning then spinConn:Disconnect(); return end
         angle = (angle + dt * 90) % 360   -- 90 deg/sec idle spin
-        ring.Rotation     = angle
-        ringGlow.Rotation = angle * 0.6   -- glow rotates slower for layered feel
+        ring.Rotation = angle
     end)
 
     task.delay(dur, function()
@@ -144,10 +120,8 @@ local function ShowNotification(title, message, duration)
         spinning = false
         local spinOut = TweenInfo.new(0.28, Enum.EasingStyle.Quart, Enum.EasingDirection.In)
         ts:Create(ring,     spinOut, {Rotation = angle + 720}):Play()
-        ts:Create(ringGlow, spinOut, {Rotation = (angle * 0.6) + 360, BackgroundTransparency = 1}):Play()
         ts:Create(vLabel,   spinOut, {TextTransparency = 1}):Play()
         ts:Create(card,  eOut, {Position=UDim2.new(1,10,1,-90),  BackgroundTransparency=1}):Play()
-        ts:Create(bloom, eOut, {Position=UDim2.new(1,10,1,-95),  BackgroundTransparency=1}):Play()
         task.wait(0.3); gui:Destroy()
     end)
 end
