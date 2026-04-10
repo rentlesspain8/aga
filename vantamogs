@@ -1,5 +1,5 @@
 -- mooze.txt | Mooze 2.0 Logic
--- Run config.lua first — it sets getgenv().Mooze and loadstrings this file.
+-- Run config.lua first — it sets shared.MoozeV2 and loadstrings this file.
 
 local Services = {
     Players = game:GetService("Players"),
@@ -148,8 +148,8 @@ end
 -- ============================================================================
 -- CONFIG GUARD
 -- ============================================================================
-assert(getgenv().Mooze, "[Mooze] Config not found. Run config.lua first.")
-assert(getgenv().Mooze["Global"] and getgenv().Mooze["Global"]["Enabled"], "[Mooze] Disabled in config.")
+assert(shared.MoozeV2, "[Mooze] Config not found. Run config.lua first.")
+assert(shared.MoozeV2["Silent Aim"], "[Mooze] Invalid config structure.")
 
 -- ============================================================================
 -- AC BYPASS
@@ -213,9 +213,9 @@ local Camera      = Services.Workspace.CurrentCamera
 local RunService  = Services.RunService
 local UserInputService = Services.UserInputService
 
-local Locked      = false
-local LockTarget  = nil
-local CurrentFOV  = getgenv().Mooze["Silent Aimbot"]["FOV"]["Size"]["X"] or 40
+local Locked     = false
+local LockTarget = nil
+local CurrentFOV = shared.MoozeV2["Silent Aim"]["FOV"]["Size"] or 40
 
 local BodyParts = {
     "Head","UpperTorso","HumanoidRootPart","LowerTorso",
@@ -243,18 +243,18 @@ end
 -- ============================================================================
 -- TRIGGER BOT
 -- ============================================================================
-local Config        = getgenv().Mooze
-local TriggerConfig = Config["Trigger Bot"]
+local Config         = shared.MoozeV2
+local TriggerConfig  = Config["Trigger Bot"]
 local VelocityConfig = Config["Velocity Calculation"]
 
 local TriggerCircle = Drawing.new("Circle")
-TriggerCircle.Visible   = false
+TriggerCircle.Visible      = false
 TriggerCircle.Transparency = 1
-TriggerCircle.Color     = Color3.new(1,1,1)
-TriggerCircle.Filled    = true
-TriggerCircle.Radius    = TriggerConfig["FOV"]["X"] * 5
-TriggerCircle.NumSides  = math.clamp(math.floor(TriggerCircle.Radius * 2), 20, 100)
-TriggerCircle.Position  = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+TriggerCircle.Color        = Color3.new(1,1,1)
+TriggerCircle.Filled       = true
+TriggerCircle.Radius       = TriggerConfig["FOV"] * 5
+TriggerCircle.NumSides     = 64
+TriggerCircle.Position     = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
 
 local LastTriggerStep   = 0
 local TriggerStepInterval = 0.05
@@ -276,10 +276,11 @@ local function GetTargetInFOV()
                 if part.Transparency < 1 then
                     local position = part.Position
                     if part.Name == "HumanoidRootPart" then
-                        position = position + Vector3.new(prediction.X, prediction.Y, prediction.Z)
-                        if velocityEnabled then
+                        local pred = TriggerConfig["Prediction"]
+                        position = position + Vector3.new(pred["X"], pred["Y"], pred["Z"])
+                        if VelocityConfig and VelocityConfig["Enabled"] then
                             local velocity = part.Velocity
-                            if velocity.Magnitude > velocityMagnitude then
+                            if velocity.Magnitude > VelocityConfig["Magnitude"] then
                                 position = position + velocity * 0.1
                             end
                         end
@@ -299,12 +300,13 @@ local function GetTargetInFOV()
     return bestPlayer
 end
 
-local TriggerKey = Enum.KeyCode[TriggerConfig.Activation["Activation Bind"]:upper()]
+local TriggerKey = Enum.KeyCode[TriggerConfig["Bind"]:upper()]
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if not gameProcessed and input.KeyCode == TriggerKey then
-        TriggerConfig.Enabled = not TriggerConfig.Enabled
-        print("[Trigger Bot]", TriggerConfig.Enabled and "Enabled" or "Disabled")
-        ShowNotification("Trigger Bot", TriggerConfig.Enabled and "Enabled" or "Disabled", 3)
+        if TriggerConfig["Type"] == "Toggle" then
+            TriggerConfig["Enabled"] = not TriggerConfig["Enabled"]
+        end
+        ShowNotification("Trigger Bot", TriggerConfig["Enabled"] and "Enabled" or "Disabled", 2)
     end
 end)
 
@@ -313,15 +315,10 @@ RunService.Heartbeat:Connect(function(deltaTime)
     if LastTriggerStep < TriggerStepInterval then return end
     LastTriggerStep = 0
 
-    if TriggerConfig.Enabled then
+    if TriggerConfig["Enabled"] then
         local target = GetTargetInFOV()
-        local aimGui = LocalPlayer:FindFirstChildOfClass("PlayerGui")
-            and LocalPlayer.PlayerGui:FindFirstChild("Aim")
-        if aimGui then
-            TriggerCircle.Position = aimGui.AbsolutePosition
-            TriggerCircle.Radius = TriggerConfig["FOV"]["X"] * 5
-            TriggerCircle.NumSides = math.clamp(math.floor(TriggerCircle.Radius * 2), 20, 100)
-        end
+        TriggerCircle.Radius = TriggerConfig["FOV"] * 5
+        TriggerCircle.Position = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
 
         if target and LocalPlayer.Character then
             local tool = LocalPlayer.Character:FindFirstChildOfClass("Tool")
@@ -329,10 +326,10 @@ RunService.Heartbeat:Connect(function(deltaTime)
                 local cleanName = function(text) return text:lower():gsub("[%[%]%- ]","") end
                 local toolName = cleanName(tool.Name)
                 local allowed = false
-                for _, weapon in ipairs(TriggerConfig.Weapons) do
+                for _, weapon in ipairs(TriggerConfig["Weapons"]) do
                     if toolName:find(cleanName(weapon), 1, true) then allowed = true; break end
                 end
-                if allowed and tick() - LastActivationTime >= TriggerConfig["Click Cooldown"] then
+                if allowed and tick() - LastActivationTime >= TriggerConfig["Cooldown"] then
                     tool:Activate(); tool:Deactivate()
                     LastActivationTime = tick()
                 end
@@ -345,10 +342,9 @@ end)
 -- CAMERA AIMBOT
 -- ============================================================================
 do
-    local CameraAimbotConfig = getgenv().Mooze["Camera Aimbot"]
-    CameraAimbotConfig["Keybind"] = getgenv().Mooze["Global"]["Keybind"] or "C"
+    local CamCfg       = shared.MoozeV2["Camera Lock"]
     local CurrentCamera = Services.Workspace.CurrentCamera
-    local AimKey = Enum.KeyCode[CameraAimbotConfig["Keybind"]:upper()]
+    local AimKey        = Enum.KeyCode[shared.MoozeV2["General"]["Binds"]["Camera Lock"]:upper()]
 
     local function IsKnockedOut(character)
         if not character then return false end
@@ -379,8 +375,8 @@ do
                 end
             end
             Locked = false; LockTarget = nil
-            ShowNotification("Target Lost", "Target died or knocked - unlocked", 2)
-            CameraAimbotConfig["Enabled"] = false
+            ShowNotification("Target Lost", "unlocked", 2)
+            CamCfg["Enabled"] = false
             return nil
         end
         return nil
@@ -412,21 +408,21 @@ do
                 if bestTarget then
                     Locked = true; LockTarget = bestTarget
                     local player = Players:GetPlayerFromCharacter(bestTarget.Parent)
-                    if player then ShowNotification("Locked On", player.Name, 3) end
-                    CameraAimbotConfig["Enabled"] = true
+                    if player then ShowNotification("Locked", player.Name, 2) end
+                    CamCfg["Enabled"] = true
                 else
-                    ShowNotification("No Target", "No valid player near mouse", 2)
+                    ShowNotification("No Target", "no player near mouse", 2)
                 end
             else
                 Locked = false; LockTarget = nil
-                CameraAimbotConfig["Enabled"] = false
-                ShowNotification("Unlocked", "Lock disabled", 2)
+                CamCfg["Enabled"] = false
+                ShowNotification("Unlocked", "lock off", 2)
             end
         end
     end)
 
     RunService.RenderStepped:Connect(function()
-        if CameraAimbotConfig["Enabled"] then
+        if CamCfg["Enabled"] then
             local targetPart = GetLockTarget()
             if targetPart then
                 CurrentCamera.CFrame = CFrame.new(CurrentCamera.CFrame.Position, targetPart.Position)
@@ -439,19 +435,19 @@ end
 -- SILENT AIMBOT
 -- ============================================================================
 do
-    local SilentAimbotConfig = getgenv().Mooze["Silent Aimbot"]
+    local SACfg = shared.MoozeV2["Silent Aim"]
     local Mouse = LocalPlayer:GetMouse()
     local LastMousePosition = Vector2.new(0, 0)
     local CurrentTarget = nil
 
     local function GetClosestPoint(player)
         local bestPart, bestDistance = nil, math.huge
-        local pointScale = (SilentAimbotConfig["Closest Point"] or {})["Point Scale"] or 1.0
+        local scale = (SACfg["Closest Point"] or {})["Scale"] or 1.0
         if player.Character then
             for _, part in ipairs(GetBodyParts(player.Character)) do
                 local sp, on = Camera:WorldToViewportPoint(part.Position)
                 if on and sp.Z > 0 then
-                    local d = (LastMousePosition - Vector2.new(sp.X, sp.Y)).Magnitude * pointScale
+                    local d = (LastMousePosition - Vector2.new(sp.X, sp.Y)).Magnitude * scale
                     if d < bestDistance then bestPart, bestDistance = part, d end
                 end
             end
@@ -460,13 +456,13 @@ do
     end
 
     local FOVCircle = Drawing.new("Circle")
-    FOVCircle.Visible      = SilentAimbotConfig["FOV"]["Enabled"]
+    FOVCircle.Visible      = SACfg["FOV"]["Visible"]
     FOVCircle.Transparency = 1
     FOVCircle.Thickness    = 1.5
     FOVCircle.Color        = Color3.new(1, 1, 1)
     FOVCircle.NumSides     = 128
     FOVCircle.Filled       = false
-    FOVCircle.Radius       = SilentAimbotConfig["FOV"]["Size"].X * 5
+    FOVCircle.Radius       = SACfg["FOV"]["Size"] * 5
 
     local CachedRadius = FOVCircle.Radius
 
@@ -492,11 +488,11 @@ do
         return false
     end
 
-    -- position update: every render frame, zero throttle = no choppiness
+    -- position: every render frame, zero throttle
     RunService.RenderStepped:Connect(function()
-        local fovEnabled = SilentAimbotConfig["FOV"]["Enabled"]
-        FOVCircle.Visible = fovEnabled
-        if not fovEnabled then return end
+        local fovCfg = SACfg["FOV"]
+        FOVCircle.Visible = fovCfg["Enabled"] and fovCfg["Visible"]
+        if not FOVCircle.Visible then return end
 
         if IsShiftLockActive() then
             FOVCircle.Position = Vector2.new(Camera.ViewportSize.X * 0.5, Camera.ViewportSize.Y * 0.5)
@@ -508,23 +504,23 @@ do
         end
     end)
 
-    -- radius + target logic: throttled, no need to run every frame
+    -- radius + target: throttled
     local LastLogicStep = 0
     RunService.Heartbeat:Connect(function(dt)
         LastLogicStep = LastLogicStep + dt
         if LastLogicStep < 0.05 then return end
         LastLogicStep = 0
 
-        local fovConfig   = SilentAimbotConfig["FOV"]
+        local fovCfg      = SACfg["FOV"]
         local currentTool = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Tool")
-        local radius      = fovConfig["Size"].X * 5
+        local radius      = fovCfg["Size"] * 5
 
-        if fovConfig["Weapons Configuration"] and fovConfig["Weapons Configuration"]["Enabled"] and currentTool then
+        if fovCfg["Weapons"]["Enabled"] and currentTool then
             local wn = string.lower(currentTool.Name or "")
             if string.find(wn, "shotgun") then
-                radius = fovConfig["Weapons Configuration"]["Shotguns"].X * 5
+                radius = fovCfg["Weapons"]["Shotguns"] * 5
             elseif string.find(wn, "pistol") then
-                radius = fovConfig["Weapons Configuration"]["Pistols"].X * 5
+                radius = fovCfg["Weapons"]["Pistols"] * 5
             end
         end
 
@@ -536,9 +532,9 @@ do
         local bestPart, bestDist = nil, math.huge
         for _, player in pairs(Players:GetPlayers()) do
             if player ~= LocalPlayer and player.Character then
-                local targetPart = SilentAimbotConfig["Hit Part"] == "Closest Point"
+                local targetPart = SACfg["Hit Part"] == "Closest Point"
                     and GetClosestPoint(player)
-                    or player.Character:FindFirstChild("Head")
+                    or player.Character:FindFirstChild(SACfg["Hit Part"] or "Head")
                 if targetPart then
                     local sp, on = Camera:WorldToViewportPoint(targetPart.Position)
                     if on and sp.Z > 0 then
@@ -566,17 +562,17 @@ do
                 if object:IsA("Mouse") and (property == "Hit" or property == "Target") then
                     local target = CurrentTarget
                     if target then
-                        local prediction = SilentAimbotConfig["Prediction"]
-                        local redirection = SilentAimbotConfig["Client Bullet Redirection"]
+                        local pred = SACfg["Prediction"]
+                        local redir = SACfg["Client Redirect"]
                         local currentTool = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Tool")
-                        if redirection["Enabled"] and currentTool then
-                            for _, weapon in ipairs(redirection["Weapons"]) do
+                        if redir["Enabled"] and currentTool then
+                            for _, weapon in ipairs(redir["Weapons"]) do
                                 if string.find(string.lower(tostring(currentTool.Name)), string.lower(weapon)) then
-                                    prediction = redirection["Prediction"]; break
+                                    pred = redir["Prediction"]; break
                                 end
                             end
                         end
-                        local offset = target.Velocity * Vector3.new(prediction.X, prediction.Y, prediction.Z)
+                        local offset = target.Velocity * Vector3.new(pred["X"], pred["Y"], pred["Z"])
                         if property == "Hit" then return ApplyPrediction(target.CFrame, offset)
                         else return target end
                     end
@@ -585,45 +581,38 @@ do
             end)
         end)
         if success then
-            print("[Silent Aimbot] Metatable hooking enabled")
+            print("[Silent Aim] Metatable hooking enabled")
         else
-            warn("[Silent Aimbot] Metatable hooking failed, using basic mode")
-            ShowNotification("Silent Aimbot", "Running in basic mode", 5)
+            warn("[Silent Aim] Metatable hooking failed")
+            ShowNotification("Silent Aim", "basic mode", 4)
         end
     else
-        warn("[Silent Aimbot] Metatable hooking not supported on this executor")
-        ShowNotification("Silent Aimbot", "Limited mode (no metatable)", 5)
+        warn("[Silent Aim] Not supported on this executor")
+        ShowNotification("Silent Aim", "limited mode", 4)
     end
 end
 
 -- ============================================================================
 -- SPREAD MODIFICATIONS
 -- ============================================================================
-local SpreadConfig = getgenv().Mooze["Weapon Modifications"]
-    and getgenv().Mooze["Weapon Modifications"]["Spread Modifications"]
+local SpreadConfig = shared.MoozeV2["Weapon Modifications"]
+    and shared.MoozeV2["Weapon Modifications"]["Spread Changer"]
 
 local function ApplySpread()
-    if not SpreadConfig or not SpreadConfig.Enabled then return end
-    local function NormalizeString(text) return tostring(text):lower():gsub("%W", "") end
+    if not SpreadConfig or not SpreadConfig["Enabled"] then return end
+    local function Norm(text) return tostring(text):lower():gsub("%W", "") end
     for weaponKey, settings in pairs(SpreadConfig) do
         if weaponKey ~= "Enabled" and type(settings) == "table" then
-            local multiplier = settings.Multiplier
-            local hSpread = 0.1 * multiplier
-            local vSpread = 0.1 * multiplier
-            local keyName = NormalizeString(weaponKey)
+            local val    = settings["Value"] or 1
+            local spread = 0.1 * val
+            local keyName = Norm(weaponKey)
             for _, fn in ipairs(getgc(true)) do
                 if type(fn) == "function" and islclosure(fn) and not isexecutorclosure(fn) then
                     local info = debug.getinfo(fn)
-                    if info and info.short_src then
-                        if NormalizeString(info.short_src):find(keyName, 1, true) then
-                            for idx, constant in ipairs(debug.getconstants(fn)) do
-                                if type(constant) == "number" then
-                                    if constant > 0 and constant < 0.1 then
-                                        debug.setconstant(fn, idx, hSpread)
-                                    elseif constant >= 0.1 and constant < 0.3 then
-                                        debug.setconstant(fn, idx, vSpread)
-                                    end
-                                end
+                    if info and info.short_src and Norm(info.short_src):find(keyName, 1, true) then
+                        for idx, constant in ipairs(debug.getconstants(fn)) do
+                            if type(constant) == "number" and constant > 0 and constant < 0.3 then
+                                debug.setconstant(fn, idx, spread)
                             end
                         end
                     end
@@ -643,11 +632,11 @@ end)
 -- ============================================================================
 -- WALKSPEED
 -- ============================================================================
-local SpeedConfig = getgenv().Mooze["Movement Modifications"]["Speed Modifications"]
+local SpeedConfig = shared.MoozeV2["Player Modifications"]["Speed"]
 
-print("[Walkspeed] Enabled:", SpeedConfig.Enabled)
-if SpeedConfig.Enabled then
-    print("[Walkspeed] Speed:", SpeedConfig.Normal.Multiplier)
+print("[Walkspeed] Enabled:", SpeedConfig["Enabled"])
+if SpeedConfig["Enabled"] then
+    print("[Walkspeed] Speed:", SpeedConfig["Default"]["Value"])
 
     local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
     local Humanoid  = Character:FindFirstChildOfClass("Humanoid") or Character:WaitForChild("Humanoid")
@@ -674,20 +663,20 @@ if SpeedConfig.Enabled then
     end)
 
     RunService.RenderStepped:Connect(function()
-        if not SpeedConfig.Enabled then return end
+        if not SpeedConfig["Enabled"] then return end
         if not Humanoid or Humanoid.Health <= 0 then return end
-        local speed = SpeedConfig.Normal and SpeedConfig.Normal.Multiplier or Humanoid.WalkSpeed
-        if Humanoid.Health < LowHealthThreshold and SpeedConfig["Low Health"] then
-            speed = SpeedConfig["Low Health"].Multiplier
-        elseif Reloading and SpeedConfig.Reloading then
-            speed = SpeedConfig.Reloading.Multiplier
-        elseif Shooting and SpeedConfig.Shooting then
-            speed = SpeedConfig.Shooting.Multiplier
+        local speed = SpeedConfig["Default"]["Value"]
+        if Humanoid.Health < LowHealthThreshold then
+            speed = SpeedConfig["Low Health"]["Value"]
+        elseif Reloading then
+            speed = SpeedConfig["Reloading"]["Value"]
+        elseif Shooting then
+            speed = SpeedConfig["Shooting"]["Value"]
         end
         if Humanoid.WalkSpeed ~= speed then Humanoid.WalkSpeed = speed end
     end)
 
-    ShowNotification("Walkspeed", "Enabled — speed: " .. SpeedConfig.Normal.Multiplier, 4)
+    ShowNotification("Walkspeed", "speed: " .. SpeedConfig["Default"]["Value"], 3)
 else
     print("[Walkspeed] Disabled by config")
 end
@@ -695,17 +684,17 @@ end
 -- ============================================================================
 -- RAPID FIRE
 -- ============================================================================
-local RapidFireConfig = getgenv().Mooze["Rapid Fire"]
+local RapidFireConfig = shared.MoozeV2["Weapon Modifications"]["Rapid Fire"]
 
-print("[Rapid Fire] Enabled:", RapidFireConfig and RapidFireConfig.Enabled or false)
-if RapidFireConfig and RapidFireConfig.Enabled then
+print("[Rapid Fire] Enabled:", RapidFireConfig and RapidFireConfig["Enabled"] or false)
+if RapidFireConfig and RapidFireConfig["Enabled"] then
     local CooldownProps = {"Cooldown", "FireRate", "ShootCooldown", "Delay", "ShootDelay"}
     RunService.Heartbeat:Connect(function()
-        if not RapidFireConfig.Enabled then return end
+        if not RapidFireConfig["Enabled"] then return end
         local char = LocalPlayer.Character
         local tool = char and char:FindFirstChildOfClass("Tool")
         if not tool then return end
-        local cdv = RapidFireConfig.CooldownValue or 0
+        local cdv = RapidFireConfig["Cooldown"] or 0
         for _, prop in ipairs(CooldownProps) do
             local v = tool:FindFirstChild(prop)
             if v and (v:IsA("NumberValue") or v:IsA("IntValue")) then v.Value = cdv end
@@ -716,7 +705,7 @@ if RapidFireConfig and RapidFireConfig.Enabled then
             end
         end
     end)
-    ShowNotification("Rapid Fire", "Enabled — cooldown set to " .. (RapidFireConfig.CooldownValue or 0), 4)
+    ShowNotification("Rapid Fire", "cooldown → " .. (RapidFireConfig["Cooldown"] or 0), 3)
 else
     print("[Rapid Fire] Disabled by config")
 end
