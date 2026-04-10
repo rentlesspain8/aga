@@ -216,6 +216,7 @@ local UserInputService = Services.UserInputService
 local Locked     = false
 local LockTarget = nil
 local CurrentFOV = shared.MoozeV2["Silent Aim"]["FOV"]["Size"] or 40
+local LockedTarget = nil  -- silent aim target (shared with ESP)
 
 local BodyParts = {
     "Head","UpperTorso","HumanoidRootPart","LowerTorso",
@@ -443,13 +444,44 @@ do
     local CurrentTarget     = nil
     local SilentAimActive   = SACfg["Enabled"] == true
 
-    -- keybind toggle
+    -- keybind: press to lock onto nearest player in FOV, press again to unlock
     local SAKey = Enum.KeyCode[shared.MoozeV2["General"]["Binds"]["Silent Aim"]:upper()]
     UserInputService.InputBegan:Connect(function(input, gameProcessed)
         if gameProcessed then return end
         if input.KeyCode == SAKey then
-            SilentAimActive = not SilentAimActive
-            ShowNotification("Silent Aim", SilentAimActive and "Enabled" or "Disabled", 2)
+            if LockedTarget then
+                -- already targeting — untarget
+                LockedTarget    = nil
+                SilentAimActive = false
+                ShowNotification("Silent Aim", "untargeted", 2)
+            else
+                -- find closest player in FOV and lock onto them
+                local best, bestDist = nil, math.huge
+                local mp = UserInputService:GetMouseLocation()
+                local radius = SACfg["FOV"]["Size"] * 5
+                for _, player in ipairs(Players:GetPlayers()) do
+                    if player ~= LocalPlayer and player.Character then
+                        local root = player.Character:FindFirstChild("HumanoidRootPart")
+                        if root then
+                            local sp, on = Camera:WorldToViewportPoint(root.Position)
+                            if on and sp.Z > 0 then
+                                local d = (Vector2.new(sp.X, sp.Y) - mp).Magnitude
+                                if d <= radius and d < bestDist then
+                                    bestDist = d
+                                    best = player
+                                end
+                            end
+                        end
+                    end
+                end
+                if best then
+                    LockedTarget    = best
+                    SilentAimActive = true
+                    ShowNotification("Silent Aim", "targeting " .. best.Name, 2)
+                else
+                    ShowNotification("Silent Aim", "no target in FOV", 2)
+                end
+            end
         end
     end)
 
@@ -558,6 +590,8 @@ do
         local bestPart, bestDistance = nil, math.huge
         for _, player in pairs(Players:GetPlayers()) do
             if player ~= LocalPlayer and player.Character then
+                -- if we have a locked target only aim at them
+                if LockedTarget and player ~= LockedTarget then continue end
                 local targetPart = nil
                 if SACfg["Hit Part"] == "Closest Point" then
                     targetPart = GetClosestPoint(player)
@@ -626,6 +660,19 @@ do
         warn("[Silent Aim] Metatable hooking not supported on this executor")
         ShowNotification("Silent Aim", "limited mode (no metatable)", 4)
     end
+
+    -- auto-clear locked target if they die or leave
+    RunService.Heartbeat:Connect(function()
+        if not LockedTarget then return end
+        local char = LockedTarget.Character
+        if not char then SilentAimActive = false; LockedTarget = nil; return end
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        if not hum or hum.Health <= 0 then
+            SilentAimActive = false
+            LockedTarget    = nil
+            ShowNotification("Silent Aim", "target lost", 2)
+        end
+    end)
 end
 
 -- ============================================================================
@@ -664,6 +711,104 @@ LocalPlayer.CharacterAdded:Connect(function()
     ApplySpread()
     BodyPartCache = {}
 end)
+
+-- ============================================================================
+-- ESP
+-- ============================================================================
+do
+    local ESPCfg    = shared.MoozeV2["ESP"]
+    local labels    = {}  -- [userId] = Drawing text
+
+    local function IsPlayerDead(player)
+        if not player.Character then return true end
+        local hum = player.Character:FindFirstChildOfClass("Humanoid")
+        return not hum or hum.Health <= 0
+    end
+
+    local function AddLabel(player)
+        if player == LocalPlayer then return end
+        if labels[player.UserId] then return end
+        local t = Drawing.new("Text")
+        t.Visible   = false
+        t.Center    = true
+        t.Outline   = true
+        t.Font      = ESPCfg["Font"]
+        t.Size      = ESPCfg["Size"]
+        t.Color     = ESPCfg["Color"]
+        t.Text      = player.Name
+        labels[player.UserId] = { label = t, player = player }
+    end
+
+    local function RemoveLabel(player)
+        local entry = labels[player.UserId]
+        if entry then
+            pcall(function() entry.label:Remove() end)
+            labels[player.UserId] = nil
+        end
+    end
+
+    -- init existing players
+    for _, p in ipairs(Players:GetPlayers()) do AddLabel(p) end
+    Players.PlayerAdded:Connect(function(p)
+        AddLabel(p)
+        p.CharacterAdded:Connect(function() task.wait(0.1); AddLabel(p) end)
+    end)
+    Players.PlayerRemoving:Connect(RemoveLabel)
+
+    RunService.RenderStepped:Connect(function()
+        if not ESPCfg["Enabled"] then
+            for _, entry in pairs(labels) do entry.label.Visible = false end
+            return
+        end
+
+        for uid, entry in pairs(labels) do
+            local player = entry.player
+            local label  = entry.label
+
+            -- cleanup if player left
+            if not player or not player.Parent then
+                pcall(function() label:Remove() end)
+                labels[uid] = nil
+                continue
+            end
+
+            local char = player.Character
+            if not char or IsPlayerDead(player) then
+                label.Visible = false
+                continue
+            end
+
+            -- position: under the HumanoidRootPart (feet level)
+            local hrp = char:FindFirstChild("HumanoidRootPart")
+            if not hrp then label.Visible = false; continue end
+
+            -- find the lowest Y point of the character (feet)
+            local lowestY = hrp.Position.Y - 3  -- approx feet offset
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            if hum then lowestY = hrp.Position.Y - (hum.HipHeight + 1) end
+
+            local worldPos = Vector3.new(hrp.Position.X, lowestY, hrp.Position.Z)
+            local sp, onScreen = Camera:WorldToViewportPoint(worldPos)
+
+            if not onScreen or sp.Z <= 0 then
+                label.Visible = false
+                continue
+            end
+
+            label.Position = Vector2.new(sp.X, sp.Y + ESPCfg["Offset"])
+            label.Text     = player.Name
+
+            -- red if this player is the silent aim locked target
+            if player == LockedTarget then
+                label.Color = ESPCfg["Target Color"]
+            else
+                label.Color = ESPCfg["Color"]
+            end
+
+            label.Visible = true
+        end
+    end)
+end
 
 -- ============================================================================
 -- WALKSPEED
