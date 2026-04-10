@@ -138,13 +138,6 @@ do
     pcall(function() gui.Parent=Services.CoreGui end)
     if not gui.Parent then gui.Parent=Services.Players.LocalPlayer:WaitForChild("PlayerGui") end
 
-    -- bloom behind card
-    local bloom=Instance.new("Frame")
-    bloom.Size=UDim2.new(0,320,0,100); bloom.Position=UDim2.new(0.5,-160,1,90)
-    bloom.BackgroundColor3=Color3.fromRGB(120,50,255); bloom.BackgroundTransparency=0.8
-    bloom.BorderSizePixel=0; bloom.Parent=gui
-    Instance.new("UICorner",bloom).CornerRadius=UDim.new(0,20)
-
     -- card
     local card=Instance.new("Frame")
     card.Size=UDim2.new(0,300,0,80); card.Position=UDim2.new(0.5,-150,1,90)
@@ -160,9 +153,7 @@ do
     local lglow=Instance.new("Frame")
     lglow.Size=UDim2.new(0,70,1,0); lglow.BackgroundColor3=Color3.fromRGB(100,35,210)
     lglow.BackgroundTransparency=0.88; lglow.BorderSizePixel=0; lglow.Parent=card
-    Instance.new("UICorner",lglow).CornerRadius=UDim.new(0,14)
-
-    -- logo / icon area
+    Instance.new("UICorner",lglow).CornerRadius=UDim.new(0,14)    -- logo / icon area
     local iconBg=Instance.new("Frame")
     iconBg.Size=UDim2.new(0,34,0,34); iconBg.Position=UDim2.new(0,16,0.5,-17)
     iconBg.BackgroundColor3=Color3.fromRGB(140,60,255); iconBg.BackgroundTransparency=0.3
@@ -200,24 +191,15 @@ do
     fill.BorderSizePixel=0; fill.Parent=track
     Instance.new("UICorner",fill).CornerRadius=UDim.new(1,0)
 
-    -- fill glow
-    local fillGlow=Instance.new("Frame")
-    fillGlow.Size=UDim2.new(1,0,3,0); fillGlow.Position=UDim2.new(0,0,0.5,-1)
-    fillGlow.BackgroundColor3=Color3.fromRGB(200,120,255); fillGlow.BackgroundTransparency=0.6
-    fillGlow.BorderSizePixel=0; fillGlow.Parent=fill
-    Instance.new("UICorner",fillGlow).CornerRadius=UDim.new(1,0)
-
     local eIn =TweenInfo.new(0.45,Enum.EasingStyle.Quart,Enum.EasingDirection.Out)
     local eOut=TweenInfo.new(0.35,Enum.EasingStyle.Quart,Enum.EasingDirection.In)
     local eProg=TweenInfo.new(3.2,Enum.EasingStyle.Quart,Enum.EasingDirection.Out)
 
     ts:Create(card, eIn, {Position=UDim2.new(0.5,-150,1,-90)}):Play()
-    ts:Create(bloom,eIn, {Position=UDim2.new(0.5,-160,1,-100)}):Play()
     ts:Create(fill, eProg,{Size=UDim2.new(1,0,1,0)}):Play()
 
     task.delay(4,function()
         ts:Create(card, eOut,{Position=UDim2.new(0.5,-150,1,90), BackgroundTransparency=1}):Play()
-        ts:Create(bloom,eOut,{Position=UDim2.new(0.5,-160,1,90), BackgroundTransparency=1}):Play()
         task.wait(0.4); gui:Destroy()
     end)
 end
