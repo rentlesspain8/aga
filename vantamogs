@@ -205,8 +205,14 @@ local VyronState = {
     CamLock    = false,
 }
 
-local LabelTitle = nil  -- "Vyron.cc" header
-local LabelOne   = nil
+local LabelTitle    = nil  -- "Vyron.cc" header
+local LabelOne      = nil
+local LabelOneSub   = nil  -- green target name for Silent Aim
+local LabelTwo      = nil
+local LabelThree    = nil
+local LabelFour     = nil
+local LabelFive     = nil
+local LabelFiveSub  = nil  -- green target name for Cam Lock
 local LabelTwo   = nil
 local LabelThree = nil
 local LabelFour  = nil
@@ -226,18 +232,26 @@ end
 
 local function UpdateLabels()
     if not CFG()["General"]["Show Hotkeys"] then
-        if LabelTitle then LabelTitle.Visible = false end
-        if LabelOne   then LabelOne.Visible   = false end
-        if LabelTwo   then LabelTwo.Visible   = false end
-        if LabelThree then LabelThree.Visible = false end
-        if LabelFour  then LabelFour.Visible  = false end
-        if LabelFive  then LabelFive.Visible  = false end
+        if LabelTitle   then LabelTitle.Visible   = false end
+        if LabelOne     then LabelOne.Visible     = false end
+        if LabelOneSub  then LabelOneSub.Visible  = false end
+        if LabelTwo     then LabelTwo.Visible     = false end
+        if LabelThree   then LabelThree.Visible   = false end
+        if LabelFour    then LabelFour.Visible    = false end
+        if LabelFive    then LabelFive.Visible    = false end
+        if LabelFiveSub then LabelFiveSub.Visible = false end
         return
     end
 
     -- lazy-create labels (same pattern as reference LabelOne..LabelFive)
-    if LabelTitle == nil then LabelTitle = MakeLabel() end
-    if LabelOne   == nil then LabelOne   = MakeLabel() end
+    if LabelTitle   == nil then LabelTitle   = MakeLabel() end
+    if LabelOne     == nil then LabelOne     = MakeLabel() end
+    if LabelOneSub  == nil then LabelOneSub  = MakeLabel() end
+    if LabelTwo     == nil then LabelTwo     = MakeLabel() end
+    if LabelThree   == nil then LabelThree   = MakeLabel() end
+    if LabelFour    == nil then LabelFour    = MakeLabel() end
+    if LabelFive    == nil then LabelFive    = MakeLabel() end
+    if LabelFiveSub == nil then LabelFiveSub = MakeLabel() end
     if LabelTwo   == nil then LabelTwo   = MakeLabel() end
     if LabelThree == nil then LabelThree = MakeLabel() end
     if LabelFour  == nil then LabelFour  = MakeLabel() end
@@ -264,15 +278,23 @@ local function UpdateLabels()
         LabelOne.Size    = 24
         LabelOne.Center  = true
         LabelOne.Visible = true
-        if SATarget then
-            LabelOne.Text = 'Silent Aim <font color="rgb(0,255,0)">(' .. SATarget.DisplayName .. ')</font>'
-        else
-            LabelOne.Text = 'Silent Aim <font color="rgb(0,255,0)">(N/A)</font>'
-        end
+        LabelOne.Text    = 'Silent Aim'
         LabelOne.Position = Vector2.new(vp.X / 2, offsetY)
+        -- green target sub-label rendered right after the main text
+        local targetName = SATarget and ('(' .. SATarget.DisplayName .. ')') or '(N/A)'
+        LabelOneSub.Color    = Color3.fromRGB(0, 255, 0)
+        LabelOneSub.Outline  = true
+        LabelOneSub.Size     = 24
+        LabelOneSub.Center   = false
+        LabelOneSub.Visible  = true
+        LabelOneSub.Text     = targetName
+        -- position it just to the right of LabelOne; LabelOne is centered so offset by half its width + small gap
+        local mainWidth = #'Silent Aim' * 13  -- rough pixel estimate
+        LabelOneSub.Position = Vector2.new(vp.X / 2 + mainWidth / 2 + 4, offsetY - 10)
         offsetY = offsetY + 30
     else
-        LabelOne.Visible = false
+        LabelOne.Visible    = false
+        LabelOneSub.Visible = false
     end
 
     -- Trigger Bot (label 2)
@@ -324,15 +346,25 @@ local function UpdateLabels()
         LabelFive.Size    = 24
         LabelFive.Center  = true
         LabelFive.Visible = true
-        if CamTarget then
-            LabelFive.Text = 'Cam Lock <font color="rgb(0,255,0)">(' .. CamTarget.Parent.DisplayName .. ')</font>'
-        else
-            LabelFive.Text = 'Cam Lock'
-        end
+        LabelFive.Text    = 'Cam Lock'
         LabelFive.Position = Vector2.new(vp.X / 2, offsetY)
+        if CamTarget and CamTarget.Parent then
+            local camName = '(' .. (CamTarget.Parent.DisplayName or CamTarget.Parent.Name) .. ')'
+            LabelFiveSub.Color    = Color3.fromRGB(0, 255, 0)
+            LabelFiveSub.Outline  = true
+            LabelFiveSub.Size     = 24
+            LabelFiveSub.Center   = false
+            LabelFiveSub.Visible  = true
+            LabelFiveSub.Text     = camName
+            local mainWidth = #'Cam Lock' * 13
+            LabelFiveSub.Position = Vector2.new(vp.X / 2 + mainWidth / 2 + 4, offsetY - 10)
+        else
+            LabelFiveSub.Visible = false
+        end
         offsetY = offsetY + 30
     else
-        LabelFive.Visible = false
+        LabelFive.Visible    = false
+        LabelFiveSub.Visible = false
     end
 end
 
