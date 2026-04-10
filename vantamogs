@@ -217,7 +217,7 @@ local function MakeLabel()
     t.Center  = true
     t.Outline = true
     t.Font    = Drawing.Fonts.UI
-    t.Size    = 13
+    t.Size    = 20
     t.ZIndex  = 1000
     t.Color   = Color3.fromRGB(143, 174, 211)
     return t
@@ -248,7 +248,7 @@ local function UpdateLabels()
     if CFG()["Silent Aim"]["Enabled"] and VyronState.SilentAim then
         LabelOne.Color   = Color3.fromRGB(143, 174, 211)
         LabelOne.Outline = true
-        LabelOne.Size    = 13
+        LabelOne.Size    = 20
         LabelOne.Center  = true
         LabelOne.Visible = true
         if SATarget then
@@ -266,7 +266,7 @@ local function UpdateLabels()
     if CFG()["Trigger Bot"]["Enabled"] and TBActive then
         LabelTwo.Color   = Color3.fromRGB(143, 174, 211)
         LabelTwo.Outline = true
-        LabelTwo.Size    = 13
+        LabelTwo.Size    = 20
         LabelTwo.Center  = true
         LabelTwo.Visible = true
         LabelTwo.Text    = 'Trigger Bot'
@@ -280,7 +280,7 @@ local function UpdateLabels()
     if CFG()["Player Modifications"]["Speed"]["Enabled"] and VyronState.Speed then
         LabelThree.Color   = Color3.fromRGB(143, 174, 211)
         LabelThree.Outline = true
-        LabelThree.Size    = 13
+        LabelThree.Size    = 20
         LabelThree.Center  = true
         LabelThree.Visible = true
         LabelThree.Text    = 'WalkSpeed'
@@ -294,7 +294,7 @@ local function UpdateLabels()
     if CFG()["Weapon Modifications"]["Double Tap"]["Enabled"] and VyronState.DoubleTap then
         LabelFour.Color   = Color3.fromRGB(143, 174, 211)
         LabelFour.Outline = true
-        LabelFour.Size    = 13
+        LabelFour.Size    = 20
         LabelFour.Center  = true
         LabelFour.Visible = true
         LabelFour.Text    = 'DoubleTap'
@@ -308,7 +308,7 @@ local function UpdateLabels()
     if CFG()["Camera Lock"]["Enabled"] and VyronState.CamLock then
         LabelFive.Color   = Color3.fromRGB(143, 174, 211)
         LabelFive.Outline = true
-        LabelFive.Size    = 13
+        LabelFive.Size    = 20
         LabelFive.Center  = true
         LabelFive.Visible = true
         LabelFive.Text    = 'Cam Lock'
