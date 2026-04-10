@@ -83,6 +83,72 @@ print("[Mooze] Running on:", ExecutorName)
 print("[Mooze] Hooking:", Capabilities[1] and "✓" or "✗")
 print("[Mooze] Metatable:", Capabilities[5] and "✓" or "✗")
 
+-- Loading notification
+do
+    local TweenService = Services.TweenService
+    local notifGui = Instance.new("ScreenGui")
+    notifGui.Name = "MoozeLoadNotif"
+    notifGui.ResetOnSpawn = false
+    pcall(function() notifGui.Parent = Services.CoreGui end)
+    if not notifGui.Parent then
+        notifGui.Parent = Services.Players.LocalPlayer:WaitForChild("PlayerGui")
+    end
+
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(0, 340, 0, 90)
+    frame.Position = UDim2.new(0.5, -170, 0, -100)
+    frame.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
+    frame.BorderSizePixel = 0
+    frame.Parent = notifGui
+
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 10)
+    corner.Parent = frame
+
+    local accent = Instance.new("Frame")
+    accent.Size = UDim2.new(0, 4, 1, 0)
+    accent.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+    accent.BorderSizePixel = 0
+    accent.Parent = frame
+    Instance.new("UICorner", accent).CornerRadius = UDim.new(0, 10)
+
+    local title = Instance.new("TextLabel")
+    title.Size = UDim2.new(1, -20, 0, 28)
+    title.Position = UDim2.new(0, 14, 0, 8)
+    title.BackgroundTransparency = 1
+    title.Text = "Loading Mooze 2.0"
+    title.Font = Enum.Font.SourceSansBold
+    title.TextColor3 = Color3.fromRGB(255, 255, 255)
+    title.TextSize = 17
+    title.TextXAlignment = Enum.TextXAlignment.Left
+    title.Parent = frame
+
+    local msg = Instance.new("TextLabel")
+    msg.Size = UDim2.new(1, -20, 0, 50)
+    msg.Position = UDim2.new(0, 14, 0, 34)
+    msg.BackgroundTransparency = 1
+    msg.Text = "executor: potassium — have fun!"
+    msg.Font = Enum.Font.SourceSans
+    msg.TextColor3 = Color3.fromRGB(180, 180, 180)
+    msg.TextSize = 14
+    msg.TextWrapped = true
+    msg.TextXAlignment = Enum.TextXAlignment.Left
+    msg.TextYAlignment = Enum.TextYAlignment.Top
+    msg.Parent = frame
+
+    TweenService:Create(frame, TweenInfo.new(0.35, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+        Position = UDim2.new(0.5, -170, 0, 14)
+    }):Play()
+
+    task.delay(4, function()
+        TweenService:Create(frame, TweenInfo.new(0.3), {
+            Position = UDim2.new(0.5, -170, 0, -100)
+        }):Play()
+        task.wait(0.35)
+        notifGui:Destroy()
+    end)
+end
+
 -- ============================================================================
 -- CONFIG GUARD
 -- ============================================================================
