@@ -162,9 +162,9 @@ local function RefreshESP()
         if not char or PlayerDead(p) then e.tag.Visible=false; continue end
         local hrp=char:FindFirstChild("HumanoidRootPart")
         if not hrp then e.tag.Visible=false; continue end
-        local head=char:FindFirstChild("Head")
-        local anchorPart=head or hrp
-        local sp,on=Camera:WorldToViewportPoint(anchorPart.Position)
+        -- anchor at feet: HRP is at hip height (~3 studs above ground), so subtract ~3
+        local feetPos = hrp.Position - Vector3.new(0, 3, 0)
+        local sp,on=Camera:WorldToViewportPoint(feetPos)
         if on and sp.Z>0 then
             e.tag.Position=Vector2.new(sp.X, sp.Y+espCfg["Offset"])
             local dn=p.DisplayName
