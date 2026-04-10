@@ -1,6 +1,6 @@
 -- mooze.txt | Mooze 2.0 Logic
--- Run config.lua first. It sets shared.MoozeV2.
--- RULE: every feature reads shared.MoozeV2 directly at runtime.
+-- Run config.lua first. It sets shared.Vyron.
+-- RULE: every feature reads shared.Vyron directly at runtime.
 --       Nothing is cached into a local that could drift from config.
 
 local Services = {
@@ -37,11 +37,11 @@ print("[Mooze] Metatable:", Capabilities[5] and "v" or "x")
 -- ============================================================================
 -- CONFIG GUARD
 -- ============================================================================
-assert(shared.MoozeV2,                "[Mooze] Config not found. Run config.lua first.")
-assert(shared.MoozeV2["Silent Aim"],  "[Mooze] Invalid config - missing Silent Aim section.")
+assert(shared.Vyron,                "[Mooze] Config not found. Run config.lua first.")
+assert(shared.Vyron["Silent Aim"],  "[Mooze] Invalid config - missing Silent Aim section.")
 
 -- shorthand that always reads live from config
-local function CFG() return shared.MoozeV2 end
+local function CFG() return shared.Vyron end
 
 -- ============================================================================
 -- AC BYPASS
@@ -129,7 +129,7 @@ local function PlayerKnocked(p)
 end
 
 -- ============================================================================
--- ESP  (reads shared.MoozeV2["ESP"] live every frame)
+-- ESP  (reads shared.Vyron["ESP"] live every frame)
 -- ============================================================================
 local ESPLabels = {}
 
@@ -189,7 +189,7 @@ Players.PlayerRemoving:Connect(RemoveESP)
 RunService.Heartbeat:Connect(RefreshESP)
 
 -- ============================================================================
--- TRIGGER BOT  (only runs if shared.MoozeV2["Trigger Bot"]["Enabled"] == true)
+-- TRIGGER BOT  (only runs if shared.Vyron["Trigger Bot"]["Enabled"] == true)
 -- ============================================================================
 local TBActive = false  -- runtime toggle (keybind flips this)
 local TBLastShot = 0
@@ -277,7 +277,7 @@ RunService.Heartbeat:Connect(function(dt)
 end)
 
 -- ============================================================================
--- CAMERA LOCK  (only runs if shared.MoozeV2["Camera Lock"]["Enabled"] == true)
+-- CAMERA LOCK  (only runs if shared.Vyron["Camera Lock"]["Enabled"] == true)
 -- ============================================================================
 local function IsKnockedOut(char)
     if not char then return false end
@@ -385,7 +385,7 @@ RunService.RenderStepped:Connect(function()
 end)
 
 -- ============================================================================
--- SILENT AIM  (only active if shared.MoozeV2["Silent Aim"]["Enabled"] == true)
+-- SILENT AIM  (only active if shared.Vyron["Silent Aim"]["Enabled"] == true)
 -- ============================================================================
 local SACurrentTarget = nil  -- the body part being aimed at
 local SALastMousePos  = Vector2.new(0,0)
@@ -574,7 +574,7 @@ do
 end
 
 -- ============================================================================
--- WALKSPEED  (only runs if shared.MoozeV2["Player Modifications"]["Speed"]["Enabled"] == true)
+-- WALKSPEED  (only runs if shared.Vyron["Player Modifications"]["Speed"]["Enabled"] == true)
 -- ============================================================================
 do
     local spd=CFG()["Player Modifications"]["Speed"]
@@ -617,7 +617,7 @@ do
 end
 
 -- ============================================================================
--- RAPID FIRE  (hold mouse1 to shoot fast — shared.MoozeV2["Weapon Modifications"]["Rapid Fire"]["Enabled"] == true)
+-- RAPID FIRE  (hold mouse1 to shoot fast — shared.Vyron["Weapon Modifications"]["Rapid Fire"]["Enabled"] == true)
 -- ============================================================================
 do
     local isMouseDown=false
