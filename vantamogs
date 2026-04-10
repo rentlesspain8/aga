@@ -505,33 +505,30 @@ else
 end
 
 -- ============================================================================
--- SPREAD CHANGER  (only runs if shared.MoozeV2["Weapon Modifications"]["Spread Changer"]["Enabled"] == true)
+-- SPREAD CHANGER  (hooks math.random globally — works on all weapons)
 -- ============================================================================
-local function ApplySpread()
+do
     local sc=CFG()["Weapon Modifications"]["Spread Changer"]
-    if not sc["Enabled"] then return end
-    local function norm(s) return tostring(s):lower():gsub("%W","") end
-    for wk,ws in pairs(sc) do
-        if wk~="Enabled" and type(ws)=="table" then
-            local spread=0.1*(ws["Value"] or 1)
-            local kn=norm(wk)
-            for _,fn in ipairs(getgc(true)) do
-                if type(fn)=="function" and islclosure(fn) and not isexecutorclosure(fn) then
-                    local info=debug.getinfo(fn)
-                    if info and info.short_src and norm(info.short_src):find(kn,1,true) then
-                        for idx,c in ipairs(debug.getconstants(fn)) do
-                            if type(c)=="number" and c>0 and c<0.3 then
-                                debug.setconstant(fn,idx,spread)
-                            end
-                        end
-                    end
+    if sc["Enabled"] then
+        local oldRandom
+        pcall(function()
+            oldRandom=hookfunction(math.random,function(...)
+                if checkcaller() then return oldRandom(...) end
+                local scCfg=CFG()["Weapon Modifications"]["Spread Changer"]
+                if not scCfg["Enabled"] then return oldRandom(...) end
+                local args={...}
+                -- intercept spread calls: math.random() or math.random(-x, x) patterns
+                if #args==0 or (args[1] and type(args[1])=="number" and args[1]<0) then
+                    local amt=scCfg["Amount"] or 0
+                    -- amt=0 means 0 spread, scale up from there
+                    if amt==0 then return 0 end
+                    return oldRandom(...) * (amt/100)
                 end
-            end
-        end
+                return oldRandom(...)
+            end)
+        end)
     end
 end
-ApplySpread()
-LocalPlayer.CharacterAdded:Connect(function() task.wait(1); ApplySpread(); BodyPartCache={} end)
 
 -- ============================================================================
 -- WALKSPEED  (only runs if shared.MoozeV2["Player Modifications"]["Speed"]["Enabled"] == true)
