@@ -170,7 +170,7 @@ local function RefreshESP()
             local dn=p.DisplayName
             e.tag.Text=(dn and dn~="") and dn or p.Name
             e.tag.Size=espCfg["Size"]
-            e.tag.Color=(p==SATarget) and espCfg["Target Color"] or espCfg["Color"]
+            e.tag.Color=(p==SATarget or (CamLocked and CamTarget and CamTarget.Parent==p.Character)) and espCfg["Target Color"] or espCfg["Color"]
             e.tag.Visible=true
         else
             e.tag.Visible=false
@@ -307,6 +307,8 @@ UserInputService.InputBegan:Connect(function(input,gp)
     if not CFG()["Camera Lock"]["Enabled"] then return end
     local bind=CFG()["General"]["Binds"]["Camera Lock"]:upper()
     if input.KeyCode~=Enum.KeyCode[bind] then return end
+    -- if this key is ALSO the silent aim key, only handle cam lock here
+    -- (silent aim handler below will check the same and skip if cam lock consumed it)
     if CamLocked then
         CamLocked=false; CamTarget=nil
     else
@@ -323,7 +325,6 @@ UserInputService.InputBegan:Connect(function(input,gp)
                     local sp,on=Camera:WorldToViewportPoint(hrp.Position)
                     if on and sp.Z>0 then
                         local d=(Vector2.new(sp.X,sp.Y)-mp).Magnitude
-                        -- if FOV enabled, skip targets outside radius
                         if useFOV and d>fovRadius then continue end
                         if d<bd then bd=d; best=hrp end
                     end
@@ -481,14 +482,14 @@ RunService.Heartbeat:Connect(function(dt)
 end)
 
 -- Keybind: press to lock nearest in FOV, press again to unlock
+-- Runs independently — if cam lock shares this key both still fire separately
 UserInputService.InputBegan:Connect(function(input,gp)
     if gp then return end
-    if not CFG()["Silent Aim"]["Enabled"] then return end  -- master switch
+    if not CFG()["Silent Aim"]["Enabled"] then return end
     local bind=CFG()["General"]["Binds"]["Silent Aim"]:upper()
     if input.KeyCode~=Enum.KeyCode[bind] then return end
     if SATarget then
         SATarget=nil; SAActive=false
-        ShowNotification("Silent Aim","untargeted",2)
     else
         local best,bd=nil,math.huge
         local mp=UserInputService:GetMouseLocation()
@@ -507,9 +508,6 @@ UserInputService.InputBegan:Connect(function(input,gp)
         end
         if best then
             SATarget=best; SAActive=true
-            ShowNotification("Silent Aim","targeting "..best.Name,2)
-        else
-            ShowNotification("Silent Aim","no target in FOV",2)
         end
     end
 end)
