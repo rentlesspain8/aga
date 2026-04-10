@@ -641,6 +641,75 @@ do
 end
 
 -- ============================================================================
+-- DOUBLE TAP  (fires an extra shot before the main shot on matching weapons)
+-- Only active if shared.Vyron["Weapon Modifications"]["Double Tap"]["Enabled"] == true
+-- ============================================================================
+do
+    local DTActive = false  -- runtime toggle
+    local DTLastShot = 0
+
+    -- keybind toggle
+    UserInputService.InputBegan:Connect(function(input, gp)
+        if gp then return end
+        if not CFG()["Weapon Modifications"]["Double Tap"]["Enabled"] then return end
+        local bind = CFG()["General"]["Binds"]["Double Tap"]:upper()
+        if input.KeyCode == Enum.KeyCode[bind] then
+            DTActive = not DTActive
+            ShowNotification("Double Tap", DTActive and "on" or "off", 2)
+        end
+    end)
+
+    -- hook into tool activation to fire the extra shot
+    local function OnCharacterAdded(char)
+        char.ChildAdded:Connect(function(child)
+            if not child:IsA("Tool") then return end
+            child.Activated:Connect(function()
+                local dtCfg = CFG()["Weapon Modifications"]["Double Tap"]
+                if not dtCfg["Enabled"] or not DTActive then return end
+
+                -- check weapon is in the allowed list
+                local toolName = child.Name
+                local allowed = false
+                for _, w in ipairs(dtCfg["Weapons"]) do
+                    local function clean(s) return s:lower():gsub("[%[%]%- ]", "") end
+                    if clean(toolName):find(clean(w), 1, true) then
+                        allowed = true; break
+                    end
+                end
+                if not allowed then return end
+
+                -- cooldown guard so we don't stack infinitely
+                local now = tick()
+                if now - DTLastShot < 0.05 then return end
+                DTLastShot = now
+
+                -- fire the extra shot: activate → small delay → let normal shot proceed
+                local handle = child:FindFirstChild("Handle")
+                if handle then
+                    local toolEvent = child:FindFirstChild("RemoteEvent")
+                    if toolEvent then
+                        toolEvent:FireServer("Shoot")
+                    end
+                    -- play the shoot animation client-side if available
+                    pcall(function()
+                        local anim = LocalPlayer.Character.Humanoid.Animator
+                        local shootAnim = game:GetService("ReplicatedStorage")
+                            :WaitForChild("Animations")
+                            :WaitForChild("GunCombat")
+                            :WaitForChild("Shoot")
+                        anim:LoadAnimation(shootAnim):Play()
+                    end)
+                end
+            end)
+        end)
+    end
+
+    -- connect for current and future characters
+    if LocalPlayer.Character then OnCharacterAdded(LocalPlayer.Character) end
+    LocalPlayer.CharacterAdded:Connect(OnCharacterAdded)
+end
+
+-- ============================================================================
 -- INFINITE RANGE
 -- Method 'property' : sets Range/FireRange/Distance values on the tool every frame (original)
 -- Method 'renderstep': uses RenderStepped to pin range props — same as reference script
