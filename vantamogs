@@ -286,24 +286,23 @@ local function UpdateLabels()
 
     -- Silent Aim (label 1)
     if CFG()["Silent Aim"]["Enabled"] and VyronState.SilentAim then
-        LabelOne.Color   = Color3.fromRGB(255, 255, 255)
-        LabelOne.Outline = true
-        LabelOne.Size    = 24
-        LabelOne.Center  = true
-        LabelOne.Visible = true
-        LabelOne.Text    = 'Silent Aim'
+        LabelOne.Color    = Color3.fromRGB(255, 255, 255)
+        LabelOne.Outline  = true
+        LabelOne.Size     = 24
+        LabelOne.Center   = true
+        LabelOne.Visible  = true
+        LabelOne.Text     = 'Silent Aim'
         LabelOne.Position = Vector2.new(vp.X / 2, offsetY)
-        -- green target sub-label rendered right after the main text
+
         local targetName = SATarget and ('(' .. SATarget.DisplayName .. ')') or '(N/A)'
+        -- "Silent Aim" = 10 chars * ~14px/char at size 24 = ~140px wide, half = 70
         LabelOneSub.Color    = Color3.fromRGB(0, 255, 0)
         LabelOneSub.Outline  = true
         LabelOneSub.Size     = 24
         LabelOneSub.Center   = false
         LabelOneSub.Visible  = true
         LabelOneSub.Text     = targetName
-        -- position it just to the right of LabelOne; LabelOne is centered so offset by half its width + small gap
-        local mainWidth = #'Silent Aim' * 13  -- rough pixel estimate
-        LabelOneSub.Position = Vector2.new(vp.X / 2 + mainWidth / 2 + 4, offsetY - 10)
+        LabelOneSub.Position = Vector2.new(vp.X / 2 + 72, offsetY)
         offsetY = offsetY + 30
     else
         LabelOne.Visible    = false
@@ -369,8 +368,8 @@ local function UpdateLabels()
             LabelFiveSub.Center   = false
             LabelFiveSub.Visible  = true
             LabelFiveSub.Text     = camName
-            local mainWidth = #'Cam Lock' * 13
-            LabelFiveSub.Position = Vector2.new(vp.X / 2 + mainWidth / 2 + 4, offsetY - 10)
+            -- "Cam Lock" = 8 chars * ~14px = ~112px wide, half = 56
+            LabelFiveSub.Position = Vector2.new(vp.X / 2 + 58, offsetY)
         else
             LabelFiveSub.Visible = false
         end
