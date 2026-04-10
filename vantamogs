@@ -304,10 +304,11 @@ end
 local TriggerKey = Enum.KeyCode[TriggerConfig["Bind"]:upper()]
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if not gameProcessed and input.KeyCode == TriggerKey then
+        if not TriggerConfig["Enabled"] then return end  -- disabled in config
         if TriggerConfig["Type"] == "Toggle" then
-            TriggerConfig["Enabled"] = not TriggerConfig["Enabled"]
+            TriggerConfig["_active"] = not (TriggerConfig["_active"] or false)
         end
-        ShowNotification("Trigger Bot", TriggerConfig["Enabled"] and "Enabled" or "Disabled", 2)
+        ShowNotification("Trigger Bot", TriggerConfig["_active"] and "Enabled" or "Disabled", 2)
     end
 end)
 
@@ -316,7 +317,7 @@ RunService.Heartbeat:Connect(function(deltaTime)
     if LastTriggerStep < TriggerStepInterval then return end
     LastTriggerStep = 0
 
-    if TriggerConfig["Enabled"] then
+    if TriggerConfig["Enabled"] and TriggerConfig["_active"] then
         local target = GetTargetInFOV()
         TriggerCircle.Radius = TriggerConfig["FOV"] * 5
         TriggerCircle.Position = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
@@ -448,6 +449,7 @@ do
     local SAKey = Enum.KeyCode[shared.MoozeV2["General"]["Binds"]["Silent Aim"]:upper()]
     UserInputService.InputBegan:Connect(function(input, gameProcessed)
         if gameProcessed then return end
+        if not SACfg["Enabled"] then return end  -- disabled in config
         if input.KeyCode == SAKey then
             if LockedTarget then
                 -- already targeting — untarget
@@ -547,7 +549,7 @@ do
     -- FOV circle position: every render frame, zero throttle = smooth
     RunService.RenderStepped:Connect(function()
         local fovCfg = SACfg["FOV"]
-        FOVCircle.Visible = fovCfg["Enabled"] and fovCfg["Visible"]
+        FOVCircle.Visible = SACfg["Enabled"] and fovCfg["Enabled"] and fovCfg["Visible"]
         if not FOVCircle.Visible then return end
 
         if IsShiftLockActive() then
@@ -625,7 +627,7 @@ do
             metatable.__index = newcclosure(function(object, property)
                 if object:IsA("Mouse") and (property == "Hit" or property == "Target") then
                     local target = CurrentTarget
-                    if target and SilentAimActive then
+                    if target and SilentAimActive and SACfg["Enabled"] then
                         local prediction = SACfg["Prediction"]
                         local redirection = SACfg["Client Redirect"]
                         local currentTool = (LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Tool")) or nil
@@ -713,102 +715,105 @@ LocalPlayer.CharacterAdded:Connect(function()
 end)
 
 -- ============================================================================
--- ESP
+-- ESP  (pattern from Vanta logic.lua)
 -- ============================================================================
-do
-    local ESPCfg    = shared.MoozeV2["ESP"]
-    local labels    = {}  -- [userId] = Drawing text
+local ESPLabels = {}
 
-    local function IsPlayerDead(player)
-        if not player.Character then return true end
-        local hum = player.Character:FindFirstChildOfClass("Humanoid")
-        return not hum or hum.Health <= 0
+local function PlayerDead(p)
+    if not p.Character then return true end
+    local be = p.Character:FindFirstChild("BodyEffects")
+    if be then
+        local d = be:FindFirstChild("Dead"); if d and d.Value then return true end
+        local k = be:FindFirstChild("K.O");  if k and k.Value then return true end
     end
-
-    local function AddLabel(player)
-        if player == LocalPlayer then return end
-        if labels[player.UserId] then return end
-        local t = Drawing.new("Text")
-        t.Visible   = false
-        t.Center    = true
-        t.Outline   = true
-        t.Font      = ESPCfg["Font"]
-        t.Size      = ESPCfg["Size"]
-        t.Color     = ESPCfg["Color"]
-        t.Text      = player.Name
-        labels[player.UserId] = { label = t, player = player }
-    end
-
-    local function RemoveLabel(player)
-        local entry = labels[player.UserId]
-        if entry then
-            pcall(function() entry.label:Remove() end)
-            labels[player.UserId] = nil
-        end
-    end
-
-    -- init existing players
-    for _, p in ipairs(Players:GetPlayers()) do AddLabel(p) end
-    Players.PlayerAdded:Connect(function(p)
-        AddLabel(p)
-        p.CharacterAdded:Connect(function() task.wait(0.1); AddLabel(p) end)
-    end)
-    Players.PlayerRemoving:Connect(RemoveLabel)
-
-    RunService.RenderStepped:Connect(function()
-        if not ESPCfg["Enabled"] then
-            for _, entry in pairs(labels) do entry.label.Visible = false end
-            return
-        end
-
-        for uid, entry in pairs(labels) do
-            local player = entry.player
-            local label  = entry.label
-
-            -- cleanup if player left
-            if not player or not player.Parent then
-                pcall(function() label:Remove() end)
-                labels[uid] = nil
-                continue
-            end
-
-            local char = player.Character
-            if not char or IsPlayerDead(player) then
-                label.Visible = false
-                continue
-            end
-
-            -- position: under the HumanoidRootPart (feet level)
-            local hrp = char:FindFirstChild("HumanoidRootPart")
-            if not hrp then label.Visible = false; continue end
-
-            -- find the lowest Y point of the character (feet)
-            local lowestY = hrp.Position.Y - 3  -- approx feet offset
-            local hum = char:FindFirstChildOfClass("Humanoid")
-            if hum then lowestY = hrp.Position.Y - (hum.HipHeight + 1) end
-
-            local worldPos = Vector3.new(hrp.Position.X, lowestY, hrp.Position.Z)
-            local sp, onScreen = Camera:WorldToViewportPoint(worldPos)
-
-            if not onScreen or sp.Z <= 0 then
-                label.Visible = false
-                continue
-            end
-
-            label.Position = Vector2.new(sp.X, sp.Y + ESPCfg["Offset"])
-            label.Text     = player.Name
-
-            -- red if this player is the silent aim locked target
-            if player == LockedTarget then
-                label.Color = ESPCfg["Target Color"]
-            else
-                label.Color = ESPCfg["Color"]
-            end
-
-            label.Visible = true
-        end
-    end)
+    local h = p.Character:FindFirstChildOfClass("Humanoid")
+    return h and h.Health <= 0
 end
+
+local function PlayerKnocked(p)
+    if not shared.MoozeV2["General"]["Checks"]["Knocked"] then return false end
+    if not p.Character then return false end
+    local be = p.Character:FindFirstChild("BodyEffects")
+    if be then local k = be:FindFirstChild("K.O"); if k and k.Value then return true end end
+    return false
+end
+
+local function AddESP(player)
+    if player == LocalPlayer then return end
+    if ESPLabels[player.UserId] then return end
+    local espCfg = shared.MoozeV2["ESP"]
+    local e = { player = player, nameTag = Drawing.new("Text") }
+    e.nameTag.Size    = espCfg["Size"]
+    e.nameTag.Center  = true
+    e.nameTag.Outline = true
+    e.nameTag.Font    = Drawing.Fonts.UI
+    e.nameTag.Color   = espCfg["Color"]
+    e.nameTag.Visible = false
+    e.nameTag.ZIndex  = 1000
+    ESPLabels[player.UserId] = e
+end
+
+local function RemoveESP(player)
+    local e = ESPLabels[player.UserId]
+    if e then pcall(function() e.nameTag:Remove() end); ESPLabels[player.UserId] = nil end
+end
+
+local function RefreshESP()
+    local espCfg = shared.MoozeV2["ESP"]
+    if not espCfg["Enabled"] then
+        for _, e in pairs(ESPLabels) do e.nameTag.Visible = false end
+        return
+    end
+
+    for uid, e in pairs(ESPLabels) do
+        local p = e.player
+        if not p or not p.Parent then
+            e.nameTag.Visible = false
+            pcall(function() e.nameTag:Remove() end)
+            ESPLabels[uid] = nil
+            continue
+        end
+
+        if not p.Character or not p.Character:FindFirstChild("HumanoidRootPart") then
+            e.nameTag.Visible = false
+            continue
+        end
+
+        local hum = p.Character:FindFirstChildOfClass("Humanoid")
+        if not hum or hum.Health <= 0 then e.nameTag.Visible = false; continue end
+
+        -- position under feet using HumanoidRootPart - hipHeight
+        local hrp = p.Character:FindFirstChild("HumanoidRootPart")
+        local feetY = hrp.Position.Y - (hum.HipHeight + 1)
+        local worldFeet = Vector3.new(hrp.Position.X, feetY, hrp.Position.Z)
+        local lp, on = Camera:WorldToViewportPoint(worldFeet)
+
+        if on and lp.Z > 0 then
+            e.nameTag.Position = Vector2.new(lp.X, lp.Y + espCfg["Offset"])
+            local dn = p.DisplayName
+            e.nameTag.Text = (dn and dn ~= "") and dn or p.Name
+
+            -- red if this is the silent aim locked target
+            local isTarget = p == LockedTarget
+            e.nameTag.Color = isTarget and espCfg["Target Color"] or espCfg["Color"]
+            e.nameTag.Visible = true
+        else
+            e.nameTag.Visible = false
+        end
+    end
+end
+
+-- init
+for _, p in ipairs(Players:GetPlayers()) do AddESP(p) end
+Players.PlayerAdded:Connect(function(p)
+    if p ~= LocalPlayer then
+        AddESP(p)
+        p.CharacterAdded:Connect(function() task.wait(0.1); RemoveESP(p); AddESP(p) end)
+    end
+end)
+Players.PlayerRemoving:Connect(RemoveESP)
+
+RunService.Heartbeat:Connect(RefreshESP)
 
 -- ============================================================================
 -- WALKSPEED
