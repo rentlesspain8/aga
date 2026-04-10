@@ -237,7 +237,7 @@ local function MakeLabel()
     t.Center  = true
     t.Outline = true
     t.Font    = Drawing.Fonts.UI
-    t.Size    = 16
+    t.Size    = 14
     t.ZIndex  = 1000
     t.Color   = Color3.fromRGB(255, 255, 255)
     return t
