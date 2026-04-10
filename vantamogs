@@ -189,105 +189,137 @@ Players.PlayerRemoving:Connect(RemoveESP)
 RunService.Heartbeat:Connect(RefreshESP)
 
 -- ============================================================================
--- HOTKEY LABELS  (exact port of Script:UpdateLabels() from reference)
--- Only shows a label when that feature is actively toggled ON.
--- Labels stack downward from the bottom-center of the screen.
--- Reads CFG()["General"]["Show Hotkeys"] — set false to hide entirely.
+-- HOTKEY LABELS  (mirrors Script:UpdateLabels() from reference exactly)
+-- Uses Drawing.new("Text") with identical style: blue rgb(143,174,211), size 13,
+-- outline, centered. Only shows when feature is actively ON.
+-- Stacks downward from near the bottom of the screen (offsetY starts at
+-- viewportSize.Y - 120, each label adds 15px down).
 -- ============================================================================
 
--- five label slots, lazily created (mirrors LabelOne..LabelFive)
-local VyronLabels = { nil, nil, nil, nil, nil }
-
-local function VyronNewLabel(i)
-    if VyronLabels[i] == nil then
-        local t = Drawing.new("Text")
-        t.Visible  = false
-        t.Center   = true
-        t.Outline  = true
-        t.Font     = Drawing.Fonts.UI
-        t.Size     = 13
-        t.ZIndex   = 1000
-        VyronLabels[i] = t
-    end
-    return VyronLabels[i]
-end
-
--- runtime toggle states (flipped by each feature's keybind handler)
+-- runtime toggle states (flipped by each feature's keybind handlers)
 local VyronState = {
-    SilentAim  = false,   -- SATarget locked
-    TriggerBot = false,   -- TBActive
-    Speed      = false,   -- speedOn (set via VyronState.Speed below)
-    DoubleTap  = false,   -- DTActive
-    CamLock    = false,   -- CamLocked mirror
+    SilentAim  = false,
+    TriggerBot = false,
+    Speed      = false,
+    DoubleTap  = false,
+    CamLock    = false,
 }
 
-local function UpdateVyronLabels()
+local LabelOne   = nil
+local LabelTwo   = nil
+local LabelThree = nil
+local LabelFour  = nil
+local LabelFive  = nil
+
+local function MakeLabel()
+    local t = Drawing.new("Text")
+    t.Visible = false
+    t.Center  = true
+    t.Outline = true
+    t.Font    = Drawing.Fonts.UI
+    t.Size    = 13
+    t.ZIndex  = 1000
+    t.Color   = Color3.fromRGB(143, 174, 211)
+    return t
+end
+
+local function UpdateLabels()
     if not CFG()["General"]["Show Hotkeys"] then
-        for i = 1, 5 do
-            if VyronLabels[i] then VyronLabels[i].Visible = false end
-        end
+        if LabelOne   then LabelOne.Visible   = false end
+        if LabelTwo   then LabelTwo.Visible   = false end
+        if LabelThree then LabelThree.Visible = false end
+        if LabelFour  then LabelFour.Visible  = false end
+        if LabelFive  then LabelFive.Visible  = false end
         return
     end
 
+    -- lazy-create labels (same pattern as reference LabelOne..LabelFive)
+    if LabelOne   == nil then LabelOne   = MakeLabel() end
+    if LabelTwo   == nil then LabelTwo   = MakeLabel() end
+    if LabelThree == nil then LabelThree = MakeLabel() end
+    if LabelFour  == nil then LabelFour  = MakeLabel() end
+    if LabelFive  == nil then LabelFive  = MakeLabel() end
+
     local vp      = Camera.ViewportSize
-    -- anchor: bottom-center, 80px up from the bottom, labels stack upward
-    local baseY   = vp.Y - 80
-    local centerX = vp.X / 2
-    local slot    = 0   -- counts how many labels are visible this frame
+    -- anchor near bottom: start 120px up from bottom, stack down 15px per label
+    local offsetY = vp.Y - 120
 
-    local function ShowLabel(idx, text)
-        local lbl = VyronNewLabel(idx)
-        lbl.Color    = Color3.fromRGB(143, 174, 211)
-        lbl.Outline  = true
-        lbl.Size     = 13
-        lbl.Center   = true
-        lbl.Visible  = true
-        lbl.Text     = text
-        lbl.Position = Vector2.new(centerX, baseY - slot * 15)
-        slot = slot + 1
-    end
-
-    -- Silent Aim — show with target name when locked, plain when just toggled on
+    -- Silent Aim (label 1)
     if CFG()["Silent Aim"]["Enabled"] and VyronState.SilentAim then
+        LabelOne.Color   = Color3.fromRGB(143, 174, 211)
+        LabelOne.Outline = true
+        LabelOne.Size    = 13
+        LabelOne.Center  = true
+        LabelOne.Visible = true
         if SATarget then
-            ShowLabel(1, '<font color="rgb(143,174,211)">Silent Aim</font> <font color="rgb(255,100,100)">(' .. SATarget.DisplayName .. ')</font>')
+            LabelOne.Text = 'Silent Aim (' .. SATarget.DisplayName .. ')'
         else
-            ShowLabel(1, '<font color="rgb(143,174,211)">Silent Aim</font> <font color="rgb(255,100,100)">(N/A)</font>')
+            LabelOne.Text = 'Silent Aim (N/A)'
         end
+        LabelOne.Position = Vector2.new(vp.X / 2, offsetY)
+        offsetY = offsetY + 15
     else
-        if VyronLabels[1] then VyronLabels[1].Visible = false end
+        LabelOne.Visible = false
     end
 
-    -- Trigger Bot
+    -- Trigger Bot (label 2)
     if CFG()["Trigger Bot"]["Enabled"] and TBActive then
-        ShowLabel(2, '<font color="rgb(143,174,211)">Trigger Bot</font>')
+        LabelTwo.Color   = Color3.fromRGB(143, 174, 211)
+        LabelTwo.Outline = true
+        LabelTwo.Size    = 13
+        LabelTwo.Center  = true
+        LabelTwo.Visible = true
+        LabelTwo.Text    = 'Trigger Bot'
+        LabelTwo.Position = Vector2.new(vp.X / 2, offsetY)
+        offsetY = offsetY + 15
     else
-        if VyronLabels[2] then VyronLabels[2].Visible = false end
+        LabelTwo.Visible = false
     end
 
-    -- Speed
+    -- WalkSpeed (label 3)
     if CFG()["Player Modifications"]["Speed"]["Enabled"] and VyronState.Speed then
-        ShowLabel(3, '<font color="rgb(143,174,211)">WalkSpeed</font>')
+        LabelThree.Color   = Color3.fromRGB(143, 174, 211)
+        LabelThree.Outline = true
+        LabelThree.Size    = 13
+        LabelThree.Center  = true
+        LabelThree.Visible = true
+        LabelThree.Text    = 'WalkSpeed'
+        LabelThree.Position = Vector2.new(vp.X / 2, offsetY)
+        offsetY = offsetY + 15
     else
-        if VyronLabels[3] then VyronLabels[3].Visible = false end
+        LabelThree.Visible = false
     end
 
-    -- Double Tap
+    -- Double Tap (label 4)
     if CFG()["Weapon Modifications"]["Double Tap"]["Enabled"] and VyronState.DoubleTap then
-        ShowLabel(4, '<font color="rgb(143,174,211)">Double Tap</font>')
+        LabelFour.Color   = Color3.fromRGB(143, 174, 211)
+        LabelFour.Outline = true
+        LabelFour.Size    = 13
+        LabelFour.Center  = true
+        LabelFour.Visible = true
+        LabelFour.Text    = 'DoubleTap'
+        LabelFour.Position = Vector2.new(vp.X / 2, offsetY)
+        offsetY = offsetY + 15
     else
-        if VyronLabels[4] then VyronLabels[4].Visible = false end
+        LabelFour.Visible = false
     end
 
-    -- Camera Lock
+    -- Camera Lock (label 5)
     if CFG()["Camera Lock"]["Enabled"] and VyronState.CamLock then
-        ShowLabel(5, '<font color="rgb(143,174,211)">Cam Lock</font>')
+        LabelFive.Color   = Color3.fromRGB(143, 174, 211)
+        LabelFive.Outline = true
+        LabelFive.Size    = 13
+        LabelFive.Center  = true
+        LabelFive.Visible = true
+        LabelFive.Text    = 'Cam Lock'
+        LabelFive.Position = Vector2.new(vp.X / 2, offsetY)
+        offsetY = offsetY + 15
     else
-        if VyronLabels[5] then VyronLabels[5].Visible = false end
+        LabelFive.Visible = false
     end
 end
 
-RunService.RenderStepped:Connect(UpdateVyronLabels)
+RunService.RenderStepped:Connect(UpdateLabels)
 
 -- ============================================================================
 -- TRIGGER BOT  (only runs if shared.Vyron["Trigger Bot"]["Enabled"] == true)
