@@ -653,10 +653,43 @@ RunService.Heartbeat:Connect(function(dt)
     end
     SACircle.Radius=radius
 
-    -- if we have a locked target, only aim at them
+    -- AUTOMATIC mode: always lock onto nearest player in FOV, no keybind needed
+    if saCfg["Selection"] == "Automatic" then
+        local best,bd=nil,math.huge
+        local mp=SALastMousePos
+        for _,p in ipairs(Players:GetPlayers()) do
+            if p~=LocalPlayer and p.Character and not PlayerDead(p) and not PlayerKnocked(p) then
+                local hrp=p.Character:FindFirstChild("HumanoidRootPart")
+                if hrp then
+                    local sp,on=Camera:WorldToViewportPoint(hrp.Position)
+                    if on and sp.Z>0 then
+                        local d=(Vector2.new(sp.X,sp.Y)-mp).Magnitude
+                        if d<=radius and d<bd then bd=d; best=p end
+                    end
+                end
+            end
+        end
+        SATarget = best
+        SAActive = best ~= nil
+        VyronState.SilentAim = SAActive
+        if SATarget then
+            if PlayerDead(SATarget) or PlayerKnocked(SATarget) then
+                SATarget=nil; SAActive=false; VyronState.SilentAim=false; SACurrentTarget=nil; return
+            end
+            local hp=saCfg["Hit Part"]
+            local part = hp=="Closest Point" and SAGetClosestPoint(SATarget)
+                or SATarget.Character and SATarget.Character:FindFirstChild(hp or "Head")
+            SACurrentTarget=part
+        else
+            SACurrentTarget=nil
+        end
+        return
+    end
+
+    -- TARGET mode: keybind locks/unlocks, held until manually released
     if SATarget then
         if PlayerDead(SATarget) or PlayerKnocked(SATarget) then
-            SATarget=nil; SAActive=false
+            SATarget=nil; SAActive=false; VyronState.SilentAim=false
             ShowNotification("Silent Aim","target lost",2); SACurrentTarget=nil; return
         end
         local hp=saCfg["Hit Part"]
@@ -669,10 +702,11 @@ RunService.Heartbeat:Connect(function(dt)
 end)
 
 -- Keybind: press to lock nearest in FOV, press again to unlock
--- Runs independently — if cam lock shares this key both still fire separately
+-- Only active in Target mode — Automatic mode handles targeting in the heartbeat
 UserInputService.InputBegan:Connect(function(input,gp)
     if gp then return end
     if not CFG()["Silent Aim"]["Enabled"] then return end
+    if CFG()["Silent Aim"]["Selection"] ~= "Target" then return end  -- skip in Automatic mode
     local bind=CFG()["General"]["Binds"]["Silent Aim"]:upper()
     if input.KeyCode~=Enum.KeyCode[bind] then return end
     if SATarget then
